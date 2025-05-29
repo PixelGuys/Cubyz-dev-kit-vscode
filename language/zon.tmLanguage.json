@@ -23,7 +23,7 @@
             "end": "\""
         },
         "identifier": {
-            "name": "variable",
+            "name": "variable.other.property",
             "match": "(\\.[a-z0-9_]+)|(@\".*?\")"
         }
     }

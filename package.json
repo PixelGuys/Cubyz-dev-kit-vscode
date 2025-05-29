@@ -13,8 +13,9 @@
     "keywords": [
         "Cubyz"
     ],
+    "icon": "assets/logo.png",
     "engines": {
-        "vscode": "^1.75.0"
+        "vscode": "^1.90.0"
     },
     "activationEvents": [
         "onLanguage:zig",

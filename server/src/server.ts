@@ -1,3 +1,4 @@
+/* eslint-disable curly */
 /* --------------------------------------------------------------------------------------------
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Licensed under the MIT License. See License.txt in the project root for license information.
@@ -19,6 +20,7 @@ import {
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 import * as fs from "fs";
+import * as uri from "vscode-uri";
 import * as path from "path";
 
 // Create a connection for the server, using Node's IPC as a transport.
@@ -56,62 +58,77 @@ class AssetIndex {
     blueprints: Asset[] = [];
 
     static async new() {
-        var index = new AssetIndex();
+        const index = new AssetIndex();
+
+        if (!fs.existsSync("assets/")) return index;
 
         for (const addon of await fs.promises.readdir("assets/", {
             withFileTypes: true,
             recursive: false,
         })) {
             if (!addon.isDirectory()) continue;
-
             await AssetIndex.registerAsset(
                 index.blocks,
                 "blocks",
                 addon.name,
-                ".zon",
-                CompletionItemKind.Class
+                ".zig.zon",
+                CompletionItemKind.Enum
+            );
+            await AssetIndex.registerAsset(
+                index.blockTextures,
+                "blocks/textures",
+                addon.name,
+                ".png",
+                CompletionItemKind.Method
             );
             await AssetIndex.registerAsset(
                 index.items,
                 "items",
                 addon.name,
-                ".zon",
-                CompletionItemKind.Class
+                ".zig.zon",
+                CompletionItemKind.Field
+            );
+            await AssetIndex.registerAsset(
+                index.itemTextures,
+                "items/textures",
+                addon.name,
+                ".png",
+                CompletionItemKind.Method
             );
             await AssetIndex.registerAsset(
                 index.tools,
                 "tools",
                 addon.name,
-                ".zon",
-                CompletionItemKind.Class
+                ".zig.zon",
+                CompletionItemKind.Keyword
             );
             await AssetIndex.registerAsset(
                 index.biomes,
                 "biomes",
                 addon.name,
-                ".zon",
-                CompletionItemKind.Class
+                ".zig.zon",
+                CompletionItemKind.Constant
             );
             await AssetIndex.registerAsset(
                 index.models,
                 "models",
                 addon.name,
-                ".zon",
-                CompletionItemKind.Class
+                ".obj",
+                CompletionItemKind.Method
             );
             await AssetIndex.registerAsset(
                 index.structureBuildingBlocks,
                 "sbb",
                 addon.name,
-                ".zon",
+                ".zig.zon",
                 CompletionItemKind.Class
             );
             await AssetIndex.registerAsset(
                 index.blueprints,
                 "sbb",
                 addon.name,
-                ".zon",
-                CompletionItemKind.Class
+                ".blp",
+                CompletionItemKind.Method
             );
         }
         return index;
@@ -124,10 +141,10 @@ class AssetIndex {
         extension: string,
         kind: CompletionItemKind
     ) {
-        const path = `assets/${addon}/${scope}/`;
-        if (!fs.existsSync(path) || !fs.statSync(path).isDirectory()) return;
+        const basePath = `assets/${addon}/${scope}/`;
+        if (!fs.existsSync(basePath) || !fs.statSync(basePath).isDirectory()) return;
 
-        for (const file of await fs.promises.readdir(path, {
+        for (const file of await fs.promises.readdir(basePath, {
             withFileTypes: true,
             recursive: true,
         })) {
@@ -136,23 +153,24 @@ class AssetIndex {
             if (file.name.startsWith("_default")) continue;
             if (file.name.startsWith("_migrations")) continue;
 
-            const fileName = file.name.replace(/\.zig\.zon$/, "").replace(/\.zon$/, "");
-            const parentPath = file.parentPath.replace("//", "/").replace("\\", "/");
-            const relativePath = parentPath
-                .replace(/^assets\//, "")
-                .replace(new RegExp("^" + addon + "/"), "")
-                .replace(new RegExp("^" + scope + "/"), "");
+            const fileName = file.name.replace(new RegExp(`${extension}$`), "");
+            const parentPath = file.parentPath.replace(/\\/g, "/");
+            const relativePath = parentPath.replace(new RegExp("^" + basePath), "");
+
+            const id = `${addon}:${relativePath}/${fileName}`;
+            const location = `${parentPath}/${file.name}`;
 
             storage.push({
-                id: `${addon}:${relativePath}${fileName}`,
-                location: parentPath + fileName,
+                id: id,
+                location: location,
                 kind: kind,
             });
+            connection.console.log(`Registered ${scope} asset: '${id}' at ${location}`);
         }
     }
 }
 
-var ASSET_INDEX: AssetIndex | null = null;
+let ASSET_INDEX: AssetIndex | null = null;
 
 connection.onInitialize((params: InitializeParams) => {
     const capabilities = params.capabilities;
@@ -244,18 +262,60 @@ connection.onDidChangeWatchedFiles(async (_change) => {
 });
 
 // This handler provides the initial list of the completion items.
-connection.onCompletion((_textDocumentPosition: TextDocumentPositionParams): CompletionItem[] => {
-    // The pass parameter contains the position of the text document in
-    // which code complete got requested. For the example we ignore this
-    // info and always provide the same completion items.
-    var completions: CompletionItem[] = [];
-    if (!!ASSET_INDEX) {
-        ASSET_INDEX.blocks.forEach((element) => {
-            completions.push({
-                label: element.id,
-                kind: CompletionItemKind.Class,
-                data: completions.length,
+connection.onCompletion(async (textDocumentPosition: TextDocumentPositionParams) => {
+    if (!ASSET_INDEX) return [];
+
+    const workspaceUri = (await connection.workspace.getWorkspaceFolders())?.at(0)?.uri;
+    const workspacePath = workspaceUri ? uri.URI.parse(workspaceUri).fsPath : ".";
+    const documentPath = uri.URI.parse(textDocumentPosition.textDocument.uri).fsPath;
+
+    const relativePath = path.relative(workspacePath, documentPath).replace(/\\/g, "/");
+    connection.console.log(`Relative path: ${relativePath}`);
+    const pathSplit = relativePath.split("/");
+
+    if (pathSplit.length < 4) return [];
+
+    if (pathSplit[0] !== "assets") return [];
+    pathSplit.shift();
+    // Remove addon name.
+    pathSplit.shift();
+
+    const scope = pathSplit.shift();
+    const fileName = pathSplit.pop();
+    if (!fileName?.endsWith(".zon")) return [];
+
+    const completionsInput: Record<string, Asset> = {};
+
+    switch (scope) {
+        case "sbb":
+        case "biomes":
+            ASSET_INDEX.blueprints.forEach((element) => {
+                completionsInput[element.id] = element;
             });
+            ASSET_INDEX.structureBuildingBlocks.forEach((element) => {
+                completionsInput[element.id] = element;
+            });
+            break;
+        case "blocks":
+            ASSET_INDEX.blockTextures.forEach((element) => {
+                completionsInput[element.id] = element;
+            });
+            break;
+        case "items":
+            ASSET_INDEX.itemTextures.forEach((element) => {
+                completionsInput[element.id] = element;
+            });
+            break;
+    }
+    connection.console.log(`Completions length: ${Object.keys(completionsInput).length}`);
+
+    const completions: CompletionItem[] = [];
+    for (const element of Object.values(completionsInput)) {
+        completions.push({
+            label: element.id,
+            detail: element.location,
+            kind: element.kind,
+            data: completions.length,
         });
     }
     return completions;
