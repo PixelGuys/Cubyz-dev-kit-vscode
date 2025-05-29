@@ -1,5 +1,6 @@
 {
     "name": "cubyz-dev-kit",
+    "displayName": "Cubyz Dev Kit",
     "description": "Collection of tools helpful for Cubyz asset development.",
     "author": "Argmaster",
     "license": "GPL-3.0",
