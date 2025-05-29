@@ -1,0 +1,9 @@
+{
+    "brackets": [["{", "}"]],
+    "autoClosingPairs": [["{", "}"]],
+    "surroundingPairs": [
+        ["{", "}"],
+        ["\"", "\""],
+        ["'", "'"]
+    ]
+}

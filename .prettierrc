@@ -1,0 +1,26 @@
+{
+    "semi": true,
+    "useTabs": false,
+    "endOfLine": "lf",
+    "printWidth": 100,
+    "overrides": [
+        {
+            "files": ["*.html", "*.js", "*.json", "*.prettierrc", "*.ts"],
+            "options": {
+                "tabWidth": 4
+            }
+        },
+        {
+            "files": ["*.md"],
+            "options": {
+                "proseWrap": "always"
+            }
+        },
+        {
+            "files": ["*.css"],
+            "options": {
+                "tabWidth": 4
+            }
+        }
+    ]
+}

@@ -1,0 +1,30 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "zon",
+    "scopeName": "source.zon",
+    "patterns": [
+        { "include": "#null" },
+        { "include": "#number" },
+        { "include": "#string" },
+        { "include": "#identifier" }
+    ],
+    "repository": {
+        "null": {
+            "name": "keyword",
+            "match": "null"
+        },
+        "number": {
+            "name": "constant.numeric",
+            "match": "[+-]?((([0-9]+)(\\.[0-9]*)?)|(\\.[0-9]+))"
+        },
+        "string": {
+            "name": "string",
+            "begin": "\"",
+            "end": "\""
+        },
+        "identifier": {
+            "name": "variable",
+            "match": "(\\.[a-z0-9_]+)|(@\".*?\")"
+        }
+    }
+}
