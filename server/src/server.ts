@@ -11,17 +11,18 @@ import {
     DidChangeConfigurationNotification,
     CompletionItem,
     CompletionItemKind,
-    TextDocumentPositionParams,
     TextDocumentSyncKind,
     InitializeResult,
     DidChangeWatchedFilesNotification,
     WatchKind,
+    CompletionParams,
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 import * as fs from "fs";
 import * as uri from "vscode-uri";
 import * as path from "path";
+import * as zon from "./zon";
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -262,12 +263,12 @@ connection.onDidChangeWatchedFiles(async (_change) => {
 });
 
 // This handler provides the initial list of the completion items.
-connection.onCompletion(async (textDocumentPosition: TextDocumentPositionParams) => {
+connection.onCompletion(async (params: CompletionParams) => {
     if (!ASSET_INDEX) return [];
 
     const workspaceUri = (await connection.workspace.getWorkspaceFolders())?.at(0)?.uri;
     const workspacePath = workspaceUri ? uri.URI.parse(workspaceUri).fsPath : ".";
-    const documentPath = uri.URI.parse(textDocumentPosition.textDocument.uri).fsPath;
+    const documentPath = uri.URI.parse(params.textDocument.uri).fsPath;
 
     const relativePath = path.relative(workspacePath, documentPath).replace(/\\/g, "/");
     connection.console.log(`Relative path: ${relativePath}`);
@@ -283,6 +284,14 @@ connection.onCompletion(async (textDocumentPosition: TextDocumentPositionParams)
     const scope = pathSplit.shift();
     const fileName = pathSplit.pop();
     if (!fileName?.endsWith(".zon")) return [];
+
+    const source = documents.get(params.textDocument.uri)?.getText();
+    if(!source) return [];
+
+    const parser = new zon.Parser();
+    const ast = parser.parse(source);
+    console.log(ast);
+    console.log(params.position);
 
     const completionsInput: Record<string, Asset> = {};
 
