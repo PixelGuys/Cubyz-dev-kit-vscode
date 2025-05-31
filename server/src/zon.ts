@@ -7,6 +7,45 @@ export class Location {
         this.column = column;
         this.line = line;
     }
+    lessThan(other: Location): boolean {
+        if (this.line < other.line) {
+            return true;
+        }
+        if (this.line > other.line) {
+            return false;
+        }
+        return this.column < other.column;
+    }
+    lessOrEqual(other: Location): boolean {
+        if (this.line < other.line) {
+            return true;
+        }
+        if (this.line > other.line) {
+            return false;
+        }
+        return this.column <= other.column;
+    }
+    greaterThan(other: Location): boolean {
+        if (this.line > other.line) {
+            return true;
+        }
+        if (this.line < other.line) {
+            return false;
+        }
+        return this.column > other.column;
+    }
+    greaterOrEqual(other: Location): boolean {
+        if (this.line > other.line) {
+            return true;
+        }
+        if (this.line < other.line) {
+            return false;
+        }
+        return this.column >= other.column;
+    }
+    equals(other: Location): boolean {
+        return this.line === other.line && this.column === other.column;
+    }
     clone() {
         return new Location(this.column, this.line);
     }
@@ -36,9 +75,11 @@ export class ZonNode {
         this.start = start;
         this.end = end;
     }
-
     format(): string {
         return "";
+    }
+    walk(_walker: ZonWalker): void {
+        throw new Error("walk method not implemented");
     }
 }
 
@@ -51,7 +92,6 @@ export class ZonObject extends ZonNode {
         super(start, end);
         this.items = items;
     }
-
     format(): string {
         return (
             ".{" +
@@ -63,6 +103,9 @@ export class ZonObject extends ZonNode {
             "}"
         );
     }
+    walk(walker: ZonWalker): void {
+        walker.on_object(this);
+    }
 }
 
 export class ZonString extends ZonNode {
@@ -72,9 +115,11 @@ export class ZonString extends ZonNode {
         super(start, end);
         this.value = value;
     }
-
     format(): string {
         return `"${this.value}"`;
+    }
+    walk(walker: ZonWalker): void {
+        walker.on_string(this);
     }
 }
 
@@ -91,6 +136,9 @@ export class ZonIdentifier extends ZonNode {
             return `@"${this.value}"`;
         }
     }
+    walk(walker: ZonWalker): void {
+        walker.on_identifier(this);
+    }
 }
 
 export class ZonNumber extends ZonNode {
@@ -100,9 +148,11 @@ export class ZonNumber extends ZonNode {
         super(start, end);
         this.value = value;
     }
-
     format(): string {
         return this.value;
+    }
+    walk(walker: ZonWalker): void {
+        walker.on_number(this);
     }
 }
 export class ZonBoolean extends ZonNode {
@@ -115,6 +165,9 @@ export class ZonBoolean extends ZonNode {
     format(): string {
         return this.value ? "true" : "false";
     }
+    walk(walker: ZonWalker): void {
+        walker.on_boolean(this);
+    }
 }
 export class ZonNull extends ZonNode {
     constructor(start: Location, end: Location) {
@@ -122,6 +175,9 @@ export class ZonNull extends ZonNode {
     }
     format(): string {
         return "null";
+    }
+    walk(walker: ZonWalker): void {
+        walker.on_null(this);
     }
 }
 export class ZonSyntaxError extends ZonNode {
@@ -134,10 +190,98 @@ export class ZonSyntaxError extends ZonNode {
     format(): string {
         return `${this.value}`;
     }
+    walk(walker: ZonWalker): void {
+        walker.on_syntax_error(this);
+    }
 }
 export class ZonEnd extends ZonNode {
     constructor(start: Location, end: Location) {
         super(start, end);
+    }
+    format(): string {
+        return "";
+    }
+    walk(walker: ZonWalker): void {
+        walker.on_end(this);
+    }
+}
+
+export class ZonWalker {
+    on_object(node: ZonObject): void {
+        for (const [key, value] of node.items) {
+            key.walk(this);
+            value.walk(this);
+        }
+    }
+    on_string(_node: ZonString): void {}
+    on_identifier(_node: ZonIdentifier): void {}
+    on_number(_node: ZonNumber): void {}
+    on_boolean(_node: ZonBoolean): void {}
+    on_null(_node: ZonNull): void {}
+    on_syntax_error(_node: ZonSyntaxError): void {}
+    on_end(_node: ZonEnd): void {}
+}
+
+export class FindZonNode extends ZonWalker {
+    position: Location;
+    match: ZonNode | null = null;
+
+    constructor() {
+        super();
+        this.position = new Location(0, 0);
+        this.match = null;
+    }
+    find(node: ZonNode, position: Location): ZonNode | null {
+        this.position = position;
+        this.match = null;
+
+        node.walk(this);
+        const match = this.match;
+
+        this.position = new Location(0, 0);
+        this.match = null;
+
+        return match;
+    }
+    on_object(node: ZonObject): void {
+        if(this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+            super.on_object(node);
+        }
+    }
+    on_string(node: ZonString): void {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+            this.match = node;
+        }
+    }
+    on_identifier(node: ZonIdentifier): void {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+            this.match = node;
+        }
+    }
+    on_number(node: ZonNumber): void {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+            this.match = node;
+        }
+    }
+    on_boolean(node: ZonBoolean): void {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+            this.match = node;
+        }
+    }
+    on_null(node: ZonNull): void {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+            this.match = node;
+        }
+    }
+    on_syntax_error(node: ZonSyntaxError): void {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+            this.match = node;
+        }
+    }
+    on_end(node: ZonEnd): void {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+            this.match = node;
+        }
     }
 }
 
@@ -153,7 +297,6 @@ export class Parser {
         this.source = "";
         this.rest = "";
     }
-
     public parse(source: string): ZonNode {
         this.location = new Location(0, 0);
         this.source = source;

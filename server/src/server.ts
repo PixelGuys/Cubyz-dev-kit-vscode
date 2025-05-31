@@ -75,11 +75,10 @@ class AssetIndex {
                 ".zig.zon",
                 CompletionItemKind.Enum
             );
-            await AssetIndex.registerAsset(
+            await AssetIndex.registerTextures(
                 index.blockTextures,
                 "blocks/textures",
                 addon.name,
-                ".png",
                 CompletionItemKind.Method
             );
             await AssetIndex.registerAsset(
@@ -89,11 +88,10 @@ class AssetIndex {
                 ".zig.zon",
                 CompletionItemKind.Field
             );
-            await AssetIndex.registerAsset(
+            await AssetIndex.registerTextures(
                 index.itemTextures,
                 "items/textures",
                 addon.name,
-                ".png",
                 CompletionItemKind.Method
             );
             await AssetIndex.registerAsset(
@@ -156,10 +154,46 @@ class AssetIndex {
 
             const fileName = file.name.replace(new RegExp(`${extension}$`), "");
             const parentPath = file.parentPath.replace(/\\/g, "/");
-            const relativePath = parentPath.replace(new RegExp("^" + basePath), "");
+            let relativePath = parentPath.replace(new RegExp("^" + basePath), "");
+            if(relativePath.length !== 0) {
+                relativePath += "/";
+            }
 
-            const id = `${addon}:${relativePath}/${fileName}`;
-            const location = `${parentPath}/${file.name}`;
+            const id = `${addon}:${relativePath}${fileName}`;
+            const location = `${parentPath}${file.name}`;
+
+            storage.push({
+                id: id,
+                location: location,
+                kind: kind,
+            });
+            connection.console.log(`Registered ${scope} asset: '${id}' at ${location}`);
+        }
+    }
+    static async registerTextures(
+        storage: Asset[],
+        scope: string,
+        addon: string,
+        kind: CompletionItemKind
+    ) {
+        const basePath = `assets/${addon}/${scope}/`;
+        if (!fs.existsSync(basePath) || !fs.statSync(basePath).isDirectory()) return;
+
+        for (const file of await fs.promises.readdir(basePath, {
+            withFileTypes: true,
+            recursive: true,
+        })) {
+            if (!file.isFile()) continue;
+            if (!file.name.endsWith(".png")) continue;
+
+            const parentPath = file.parentPath.replace(/\\/g, "/");
+            let relativePath = parentPath.replace(new RegExp("^" + basePath), "");
+            if(relativePath.length !== 0) {
+                relativePath += "/";
+            }
+
+            const id = `${relativePath}${file.name}`;
+            const location = `${parentPath}${file.name}`;
 
             storage.push({
                 id: id,
@@ -290,8 +324,12 @@ connection.onCompletion(async (params: CompletionParams) => {
 
     const parser = new zon.Parser();
     const ast = parser.parse(source);
-    console.log(ast);
-    console.log(params.position);
+
+    const position = new zon.Location(params.position.character, params.position.line);
+    const node = new zon.FindZonNode().find(ast, position);
+    if(node === null) return [];
+    if(!(node instanceof zon.ZonSyntaxError) && !(node instanceof zon.ZonString)) return [];
+
 
     const completionsInput: Record<string, Asset> = {};
 
