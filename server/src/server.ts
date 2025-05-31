@@ -75,10 +75,11 @@ class AssetIndex {
                 ".zig.zon",
                 CompletionItemKind.Enum
             );
-            await AssetIndex.registerTextures(
+            await AssetIndex.registerAsset(
                 index.blockTextures,
                 "blocks/textures",
                 addon.name,
+                ".png",
                 CompletionItemKind.Method
             );
             await AssetIndex.registerAsset(
@@ -155,7 +156,7 @@ class AssetIndex {
             const fileName = file.name.replace(new RegExp(`${extension}$`), "");
             const parentPath = file.parentPath.replace(/\\/g, "/");
             let relativePath = parentPath.replace(new RegExp("^" + basePath), "");
-            if(relativePath.length !== 0) {
+            if (relativePath.length !== 0) {
                 relativePath += "/";
             }
 
@@ -188,7 +189,7 @@ class AssetIndex {
 
             const parentPath = file.parentPath.replace(/\\/g, "/");
             let relativePath = parentPath.replace(new RegExp("^" + basePath), "");
-            if(relativePath.length !== 0) {
+            if (relativePath.length !== 0) {
                 relativePath += "/";
             }
 
@@ -320,16 +321,15 @@ connection.onCompletion(async (params: CompletionParams) => {
     if (!fileName?.endsWith(".zon")) return [];
 
     const source = documents.get(params.textDocument.uri)?.getText();
-    if(!source) return [];
+    if (!source) return [];
 
     const parser = new zon.Parser();
     const ast = parser.parse(source);
 
     const position = new zon.Location(params.position.character, params.position.line);
     const node = new zon.FindZonNode().find(ast, position);
-    if(node === null) return [];
-    if(!(node instanceof zon.ZonSyntaxError) && !(node instanceof zon.ZonString)) return [];
-
+    if (node === null) return [];
+    if (!(node instanceof zon.ZonSyntaxError) && !(node instanceof zon.ZonString)) return [];
 
     const completionsInput: Record<string, Asset> = {};
 
@@ -360,7 +360,6 @@ connection.onCompletion(async (params: CompletionParams) => {
     for (const element of Object.values(completionsInput)) {
         completions.push({
             label: element.id,
-            detail: element.location,
             kind: element.kind,
             data: completions.length,
         });
