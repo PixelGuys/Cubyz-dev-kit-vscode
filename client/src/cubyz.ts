@@ -64,7 +64,7 @@ export async function formatAll(): Promise<void> {
         async () => {
             let files: vsc.Uri[] = [];
             const promises: Promise<void>[] = [];
-            for (const file of await vsc.workspace.findFiles("src/**/*.{zig,zon}")) {
+            for (const file of await vsc.workspace.findFiles("{src,assets,mods}/**/*.{zig,zon}")) {
                 files.push(file);
                 if (files.length >= 10) {
                     promises.push(compiler.formatFiles(files));
