@@ -69,6 +69,28 @@ export function activate(context: vsc.ExtensionContext) {
             }
         }
     });
+    vsc.commands.registerCommand("cubyz_dev_kit.clearCache", async () => {
+        try {
+            await cubyz.clearCache();
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
+    vsc.commands.registerCommand("cubyz_dev_kit.clearAll", async () => {
+        try {
+            await cubyz.clearAll();
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
     vsc.commands.registerCommand("cubyz_dev_kit.formatAll", async () => {
         try {
             await cubyz.formatAll();

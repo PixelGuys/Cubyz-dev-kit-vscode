@@ -57,8 +57,12 @@
                 "title": "Cubyz Dev Kit: Build Release Safe"
             },
             {
-                "command": "cubyz_dev_kit.formatFile",
-                "title": "Cubyz Dev Kit: Format Document"
+                "command": "cubyz_dev_kit.clearCache",
+                "title": "Cubyz Dev Kit: Clear Build Cache"
+            },
+            {
+                "command": "cubyz_dev_kit.clearAll",
+                "title": "Cubyz Dev Kit: Clear Compiler and Cache"
             },
             {
                 "command": "cubyz_dev_kit.formatAll",

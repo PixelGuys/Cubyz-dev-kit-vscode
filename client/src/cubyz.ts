@@ -1,11 +1,9 @@
-import * as child_process from "child_process";
+import * as childProcess from "child_process";
+import * as fs from "fs";
 import { platform } from "os";
-import * as util from "util";
 import * as vsc from "vscode";
 import * as vscode from "vscode";
 import * as log from "./log";
-
-const execPromise = util.promisify(child_process.exec);
 
 let TERMINAL: vsc.Terminal | null = null;
 
@@ -14,26 +12,21 @@ export enum BuildType {
     ReleaseSafe = "Release Safe",
 }
 
-export function build(buildType: BuildType): void {
-    let scriptPrefix = "";
+function getBuildScriptPrefix(buildType: BuildType): string {
     switch (buildType) {
         case BuildType.Debug:
-            scriptPrefix = "debug";
-            break;
+            return "debug";
         case BuildType.ReleaseSafe:
-            scriptPrefix = "run";
-            break;
+            return "run";
         default:
             throw new Error("Unsupported build type: " + buildType);
     }
+}
 
-    const scriptSuffix = getScriptSuffix();
-
-    const cwd = vsc.workspace.workspaceFolders?.[0].uri.fsPath;
-
-    const scriptPath = `${scriptPrefix}_${scriptSuffix}`;
+export function build(buildType: BuildType): void {
+    const compiler = CompilerInfo.init();
     ensureTerminal();
-    TERMINAL.sendText(`${cwd}/${scriptPath}`, true);
+    TERMINAL.sendText(compiler.getBuildScriptCommand(buildType), true);
 }
 
 function getScriptSuffix(): string {
@@ -73,12 +66,12 @@ export async function formatAll(): Promise<void> {
             const promises: Promise<void>[] = [];
             for (const file of await vsc.workspace.findFiles("src/**/*.{zig,zon}")) {
                 files.push(file);
-                if(files.length >= 10) {
+                if (files.length >= 10) {
                     promises.push(compiler.formatFiles(files));
                     files = [];
                 }
             }
-            if(files.length > 0) {
+            if (files.length > 0) {
                 promises.push(compiler.formatFiles(files));
             }
             await Promise.all(promises);
@@ -88,10 +81,22 @@ export async function formatAll(): Promise<void> {
     log.info(`All files formatted.`);
 }
 
+export async function clearCache(): Promise<void> {
+    const compiler = CompilerInfo.init();
+    await compiler.clearOut();
+    await compiler.clearCache();
+}
+
+export async function clearAll(): Promise<void> {
+    const compiler = CompilerInfo.init();
+    await compiler.clearAll();
+}
+
 class CompilerInfo {
     workspacePath: string;
     compilerPath: string;
     outPath: string;
+
     constructor(workspacePath: string) {
         switch (platform()) {
             case "linux":
@@ -123,6 +128,22 @@ class CompilerInfo {
             default:
                 throw new Error("Unsupported platform: " + platform());
         }
+    }
+    static init() {
+        const ws = vsc.workspace.workspaceFolders?.[0].uri.fsPath;
+        if (!ws) {
+            throw new Error("No workspace folder found.");
+        }
+        return new CompilerInfo(ws);
+    }
+    getBuildScriptCommand(buildType: BuildType): string {
+        const scriptPrefix = getBuildScriptPrefix(buildType);
+        const scriptSuffix = getScriptSuffix();
+        return `${this.workspacePath}/${scriptPrefix}_${scriptSuffix}`;
+    }
+    get installScriptPath(): string {
+        const scriptSuffix = getScriptSuffix();
+        return `"${this.workspacePath}/scripts/install_compiler_${scriptSuffix}"`;
     }
     get formatterPath(): string {
         switch (platform()) {
@@ -166,11 +187,39 @@ class CompilerInfo {
         }
         log.info(`Formatted files: ${fileList}`);
     }
+    async clearOut(): Promise<void> {
+        this.clearDirWithProgress(`${this.workspacePath}/zig-out`, "Clearing Zig output directory");
+    }
+    async clearDirWithProgress(dirPath: string, title: string): Promise<void> {
+        await vscode.window.withProgress(
+            {
+                title: title,
+                location: vsc.ProgressLocation.Notification,
+            },
+            async () => {
+                fs.rmSync(dirPath, { recursive: true, force: true });
+                log.info(`Cleared: '${dirPath}'`);
+                return { message: "Finished", increment: 100 };
+            }
+        );
+        log.info(`Progress finished, cleared: ${dirPath}.`);
+    }
+    async clearCache(): Promise<void> {
+        this.clearDirWithProgress(`${this.workspacePath}/.zig-cache`, "Clearing Zig cache directory");
+    }
+    async clearCompiler(): Promise<void> {
+        await this.clearDirWithProgress(`${this.workspacePath}/compiler`, "Clearing Zig compiler directory");
+    }
+    async clearAll(): Promise<void> {
+        await this.clearOut();
+        await this.clearCache();
+        await this.clearCompiler();
+    }
 }
 
-export async function runCmd(cmd: string, options: child_process.SpawnOptions) {
+export async function runCmd(cmd: string, options: childProcess.SpawnOptions) {
     log.info(`Running: '${cmd}'`);
-    const result = await child_process.spawnSync(cmd, options);
+    const result = await childProcess.spawnSync(cmd, options);
     if (result.error) throw result.error;
     if (result.status !== 0) {
         log.info(`STATUS '${cmd}'\n${result.status}\n`);
@@ -184,23 +233,22 @@ export async function runCmd(cmd: string, options: child_process.SpawnOptions) {
 }
 
 export async function ensureCompiler(): Promise<CompilerInfo> {
-    const ws = vsc.workspace.workspaceFolders?.[0].uri.fsPath;
-    if (!ws) {
-        throw new Error("No workspace folder found.");
-    }
-    const scriptSuffix = getScriptSuffix();
-    const installCompilerScript = `"${ws}/scripts/install_compiler_${scriptSuffix}"`;
+    const compiler = CompilerInfo.init();
 
     await vscode.window.withProgress(
         {
-            title: "Checking Zig compiler",
+            title: "Detecting Zig compiler",
             location: vsc.ProgressLocation.Notification,
         },
         async () => {
-            await runCmd(installCompilerScript, { cwd: ws, shell: true, timeout: 1000 * 60 * 16 });
+            await runCmd(compiler.installScriptPath, {
+                cwd: compiler.workspacePath,
+                shell: true,
+                timeout: 1000 * 60 * 16,
+            });
             return { message: "Finished", increment: 100 };
         }
     );
-    log.info(`Progress finished, creating CompilerInfo for workspace: '${ws}'`);
-    return new CompilerInfo(ws);
+    log.info(`Progress finished, creating CompilerInfo for workspace: '${compiler.workspacePath}'`);
+    return compiler;
 }
