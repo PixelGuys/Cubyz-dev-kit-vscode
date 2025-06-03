@@ -1,7 +1,9 @@
 import * as child_process from "child_process";
 import { platform } from "os";
-import * as vsc from "vscode";
 import * as util from "util";
+import * as vsc from "vscode";
+import * as vscode from "vscode";
+import * as log from "./log";
 
 const execPromise = util.promisify(child_process.exec);
 
@@ -58,17 +60,32 @@ function ensureTerminal(): void {
 }
 
 export async function formatAll(): Promise<void> {
-    const compiler = ensureCompiler();
-    child_process.execSync(
-        `${compiler.compilerPath} build fmt -- "${compiler.workspacePath}/src/zon.zig"`,
-        { cwd: compiler.workspacePath, stdio: "pipe" }
-    );
+    const compiler = await ensureCompiler();
+    await compiler.ensureFormatter();
 
-    const promises = [];
-    for (const file of await vsc.workspace.findFiles("**/{.zig,.zon}")) {
-        promises.push(compiler.formatFile(file));
-    }
-    await Promise.all(promises);
+    await vscode.window.withProgress(
+        {
+            title: "Formatting all Zig and Zon files",
+            location: vsc.ProgressLocation.Notification,
+        },
+        async () => {
+            let files: vsc.Uri[] = [];
+            const promises: Promise<void>[] = [];
+            for (const file of await vsc.workspace.findFiles("src/**/*.{zig,zon}")) {
+                files.push(file);
+                if(files.length >= 10) {
+                    promises.push(compiler.formatFiles(files));
+                    files = [];
+                }
+            }
+            if(files.length > 0) {
+                promises.push(compiler.formatFiles(files));
+            }
+            await Promise.all(promises);
+            return { message: "Finished", increment: 100 };
+        }
+    );
+    log.info(`All files formatted.`);
 }
 
 class CompilerInfo {
@@ -117,27 +134,73 @@ class CompilerInfo {
                 throw new Error("Unsupported platform: " + platform());
         }
     }
-    async formatFile(file: vsc.Uri): Promise<void> {
-        await execPromise(`${this.formatterPath} "${file.fsPath}"`, {
-            cwd: this.workspacePath,
-        });
-        console.log(`Formatted file: '${file.fsPath}'`);
+    async ensureFormatter(): Promise<void> {
+        await vscode.window.withProgress(
+            {
+                title: "Building formatter",
+                location: vsc.ProgressLocation.Notification,
+            },
+            async () => {
+                const cmd = `"${this.compilerPath}" build fmt -- "${this.workspacePath}\\build.zig"`;
+                await runCmd(cmd, { cwd: this.workspacePath, shell: true });
+                return { message: "Finished", increment: 100 };
+            }
+        );
+        log.info(`Progress finished, formatter built.`);
+    }
+    async formatFiles(files: vsc.Uri[]): Promise<void> {
+        const fileList = files.reduce((acc, file) => {
+            return acc + ` "${file.fsPath}"`;
+        }, "");
+
+        try {
+            await runCmd(`"${this.formatterPath}" ${fileList}`, {
+                cwd: this.workspacePath,
+                shell: true,
+            });
+        } catch (err) {
+            if (err instanceof Error) {
+                log.err(`Error formatting files ${fileList}: ${err.message}`);
+            }
+            return;
+        }
+        log.info(`Formatted files: ${fileList}`);
     }
 }
 
-export function ensureCompiler(): CompilerInfo {
+export async function runCmd(cmd: string, options: child_process.SpawnOptions) {
+    log.info(`Running: '${cmd}'`);
+    const result = await child_process.spawnSync(cmd, options);
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+        log.info(`STATUS '${cmd}'\n${result.status}\n`);
+        log.info(`STDOUT '${cmd}'\n${result.stdout}\n`);
+        log.info(`STDERR '${cmd}'\n${result.stderr}\n`);
+        if (result.status !== 0)
+            throw new Error(
+                `Failed to build formatter. Compiler exited with status code ${result.status}`
+            );
+    }
+}
+
+export async function ensureCompiler(): Promise<CompilerInfo> {
     const ws = vsc.workspace.workspaceFolders?.[0].uri.fsPath;
     if (!ws) {
         throw new Error("No workspace folder found.");
     }
     const scriptSuffix = getScriptSuffix();
-    const installCompilerScript = `${ws}/scripts/install_compiler_${scriptSuffix}`;
+    const installCompilerScript = `"${ws}/scripts/install_compiler_${scriptSuffix}"`;
 
-    console.log(`Running script: ${installCompilerScript}`);
-    child_process.execSync(installCompilerScript, {
-        cwd: ws,
-        stdio: "inherit",
-        timeout: 1000 * 60 * 16,
-    });
+    await vscode.window.withProgress(
+        {
+            title: "Checking Zig compiler",
+            location: vsc.ProgressLocation.Notification,
+        },
+        async () => {
+            await runCmd(installCompilerScript, { cwd: ws, shell: true, timeout: 1000 * 60 * 16 });
+            return { message: "Finished", increment: 100 };
+        }
+    );
+    log.info(`Progress finished, creating CompilerInfo for workspace: '${ws}'`);
     return new CompilerInfo(ws);
 }

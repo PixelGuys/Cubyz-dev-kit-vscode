@@ -58,6 +58,17 @@ export function activate(context: vsc.ExtensionContext) {
             }
         }
     });
+    vsc.commands.registerCommand("cubyz_dev_kit.buildReleaseSafe", () => {
+        try {
+            cubyz.build(cubyz.BuildType.ReleaseSafe);
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
     vsc.commands.registerCommand("cubyz_dev_kit.formatAll", async () => {
         try {
             await cubyz.formatAll();
