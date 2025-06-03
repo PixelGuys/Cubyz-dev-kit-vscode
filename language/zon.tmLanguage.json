@@ -15,7 +15,7 @@
         },
         "number": {
             "name": "constant.numeric",
-            "match": "[+-]?((([0-9]+)(\\.[0-9]*)?)|(\\.[0-9]+))"
+            "match": "-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?"
         },
         "string": {
             "name": "string",
@@ -24,7 +24,7 @@
         },
         "identifier": {
             "name": "variable.other.property",
-            "match": "(\\.[a-z0-9_]+)|(@\".*?\")"
+            "match": "(\\.[a-zA-Z0-9_]+)|(@\".*?\")"
         }
     }
 }

@@ -1,10 +1,6 @@
-/* --------------------------------------------------------------------------------------------
- * Copyright (c) Microsoft Corporation. All rights reserved.
- * Licensed under the MIT License. See License.txt in the project root for license information.
- * ------------------------------------------------------------------------------------------ */
-
 import * as path from "path";
-import { workspace, ExtensionContext } from "vscode";
+import * as vsc from "vscode";
+import * as cubyz from "./cubyz";
 
 import {
     LanguageClient,
@@ -15,7 +11,7 @@ import {
 
 let client: LanguageClient;
 
-export function activate(context: ExtensionContext) {
+export function activate(context: vsc.ExtensionContext) {
     // The server is implemented in node
     const serverModule = context.asAbsolutePath(path.join("server", "out", "server.js"));
 
@@ -45,6 +41,62 @@ export function activate(context: ExtensionContext) {
 
     // Start the client. This will also launch the server
     client.start();
+
+    vsc.commands.registerCommand("cubyz_dev_kit.buildDebug", () => {
+        try {
+            cubyz.build(cubyz.BuildType.Debug);
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
+    vsc.commands.registerCommand("cubyz_dev_kit.buildReleaseSafe", () => {
+        try {
+            cubyz.build(cubyz.BuildType.ReleaseSafe);
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
+    vsc.commands.registerCommand("cubyz_dev_kit.clearCache", async () => {
+        try {
+            await cubyz.clearCache();
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
+    vsc.commands.registerCommand("cubyz_dev_kit.clearAll", async () => {
+        try {
+            await cubyz.clearAll();
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
+    vsc.commands.registerCommand("cubyz_dev_kit.formatAll", async () => {
+        try {
+            await cubyz.formatAll();
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
 }
 
 export function deactivate(): Thenable<void> | undefined {

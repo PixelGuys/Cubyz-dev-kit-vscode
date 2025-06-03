@@ -1,6 +1,6 @@
 /**
  * ESLint configuration for the project.
- * 
+ *
  * See https://eslint.style and https://typescript-eslint.io for additional linting options.
  */
 // @ts-check
@@ -23,7 +23,7 @@ export default tseslint.config(
 			'@stylistic': stylistic
 		},
 		rules: {
-			'curly': 'warn',
+			'curly': 'off',
 			'@stylistic/semi': ['warn', 'always'],
 			'@typescript-eslint/no-empty-function': 'off',
 			'@typescript-eslint/naming-convention': [
