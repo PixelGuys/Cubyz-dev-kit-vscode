@@ -1,4 +1,3 @@
-/* eslint-disable curly */
 export class Location {
     column: number;
     line: number;

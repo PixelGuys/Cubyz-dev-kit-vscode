@@ -4,7 +4,8 @@
  * ------------------------------------------------------------------------------------------ */
 
 import * as path from "path";
-import { workspace, ExtensionContext } from "vscode";
+import * as vsc from "vscode";
+import * as cubyz from "./cubyz";
 
 import {
     LanguageClient,
@@ -15,7 +16,7 @@ import {
 
 let client: LanguageClient;
 
-export function activate(context: ExtensionContext) {
+export function activate(context: vsc.ExtensionContext) {
     // The server is implemented in node
     const serverModule = context.asAbsolutePath(path.join("server", "out", "server.js"));
 
@@ -45,6 +46,29 @@ export function activate(context: ExtensionContext) {
 
     // Start the client. This will also launch the server
     client.start();
+
+    vsc.commands.registerCommand("cubyz_dev_kit.buildDebug", () => {
+        try {
+            cubyz.build(cubyz.BuildType.Debug);
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
+    vsc.commands.registerCommand("cubyz_dev_kit.formatAll", async () => {
+        try {
+            await cubyz.formatAll();
+        } catch (err) {
+            if (err instanceof Error) {
+                vsc.window.showErrorMessage(err.message);
+            } else {
+                throw err;
+            }
+        }
+    });
 }
 
 export function deactivate(): Thenable<void> | undefined {

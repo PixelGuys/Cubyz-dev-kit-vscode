@@ -1,8 +1,3 @@
-/* eslint-disable curly */
-/* --------------------------------------------------------------------------------------------
- * Copyright (c) Microsoft Corporation. All rights reserved.
- * Licensed under the MIT License. See License.txt in the project root for license information.
- * ------------------------------------------------------------------------------------------ */
 import {
     createConnection,
     TextDocuments,
@@ -370,6 +365,7 @@ connection.onCompletion(async (params: CompletionParams) => {
 // This handler resolves additional information for the item selected in
 // the completion list.
 connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
+    console.log(item);
     return item;
 });
 

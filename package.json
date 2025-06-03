@@ -47,6 +47,24 @@
                 "path": "./language/zon.tmLanguage.json"
             }
         ],
+        "commands": [
+            {
+                "command": "cubyz_dev_kit.buildDebug",
+                "title": "Cubyz Dev Kit: Build Debug"
+            },
+            {
+                "command": "cubyz_dev_kit.buildReleaseSafe",
+                "title": "Cubyz Dev Kit: Build Release Safe"
+            },
+            {
+                "command": "cubyz_dev_kit.formatFile",
+                "title": "Cubyz Dev Kit: Format Document"
+            },
+            {
+                "command": "cubyz_dev_kit.formatAll",
+                "title": "Cubyz Dev Kit: Format All Documents"
+            }
+        ],
         "configuration": {
             "type": "object",
             "title": "Cubyz Dev Kit",
