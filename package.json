@@ -2,14 +2,14 @@
     "name": "cubyz-dev-kit",
     "displayName": "Cubyz Dev Kit",
     "description": "Collection of tools helpful for Cubyz asset development.",
-    "author": "Argmaster",
+    "author": "PixelGuys",
     "license": "GPL-3.0",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "repository": {
         "type": "git",
-        "url": "https://github.com/Argmaster/cubyz-dev-kit-vscode"
+        "url": "https://github.com/PixelGuys/Cubyz-dev-kit-vscode"
     },
-    "publisher": "Argmaster",
+    "publisher": "PixelGuys",
     "categories": [],
     "keywords": [
         "Cubyz"
