@@ -37,7 +37,11 @@
                     ".zon",
                     ".zig.zon"
                 ],
-                "configuration": "./language/configuration.json"
+                "configuration": "./language/configuration.json",
+                "icon": {
+                    "light": "./assets/zig-icon.png",
+                    "dark": "./assets/zig-icon.png"
+                }
             }
         ],
         "grammars": [
