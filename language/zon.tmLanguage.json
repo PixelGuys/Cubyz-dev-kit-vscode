@@ -4,6 +4,7 @@
     "scopeName": "source.zon",
     "patterns": [
         { "include": "#null" },
+        { "include": "#bool" },
         { "include": "#number" },
         { "include": "#string" },
         { "include": "#identifier" }
@@ -12,6 +13,10 @@
         "null": {
             "name": "keyword",
             "match": "null"
+        },
+        "bool": {
+            "name": "keyword",
+            "match": "(true|false)"
         },
         "number": {
             "name": "constant.numeric",
