@@ -14,7 +14,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import * as uri from "vscode-uri";
 import * as path from "path";
 import * as zon from "./zon";
-import { getAssetIndex, resetAssetIndex, Block, Item, Tool, Biome, SBB } from "./assets";
+import { resetAssetIndex, Block, Item, Tool, Biome, SBB } from "./assets";
 import { CompletionVisitor } from "./completions";
 import * as log from "./log";
 
