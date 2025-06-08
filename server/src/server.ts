@@ -14,7 +14,8 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import * as uri from "vscode-uri";
 import * as path from "path";
 import * as zon from "./zon";
-import { getAssetIndex, resetAssetIndex } from "./assets";
+import { getAssetIndex, resetAssetIndex, Block, BlockTexture, Item, ItemTexture, Tool, Biome, Model, SBB, Blueprint } from "./assets";
+import { CompletionVisitor  } from './completions';
 import * as log from './log';
 
 // Create a connection for the server, using Node's IPC as a transport.
@@ -79,8 +80,6 @@ connection.onDidChangeWatchedFiles(async (_change) => {
 
 // This handler provides the initial list of the completion items.
 connection.onCompletion(async (params: CompletionParams) => {
-    const index = await getAssetIndex();
-
     const workspaceUri = (await connection.workspace.getWorkspaceFolders())?.at(0)?.uri;
     const workspacePath = workspaceUri ? uri.URI.parse(workspaceUri).fsPath : ".";
     const documentPath = uri.URI.parse(params.textDocument.uri).fsPath;
@@ -111,51 +110,33 @@ connection.onCompletion(async (params: CompletionParams) => {
     if (node === null) return [];
     if (!(node instanceof zon.ZonSyntaxError) && !(node instanceof zon.ZonString)) return [];
 
-    const completionsInput: Record<string, Asset> = {};
+    const visitor = new CompletionVisitor(params, ast, node);
 
     switch (scope) {
-        case "sbb":
-        case "biomes":
-            index.blueprints.forEach((element) => {
-                completionsInput[element.id] = element;
-            });
-            index.structureBuildingBlocks.forEach((element) => {
-                completionsInput[element.id] = element;
-            });
-            break;
         case "blocks":
-            index.blockTextures.forEach((element) => {
-                completionsInput[element.id] = element;
-            });
+            new Block("<temp>", relativePath).visit(visitor);
             break;
         case "items":
-            index.itemTextures.forEach((element) => {
-                completionsInput[element.id] = element;
-            });
+            new Item("<temp>", relativePath).visit(visitor);
+            break;
+        case "tools":
+            new Tool("<temp>", relativePath).visit(visitor);
+            break;
+        case "biomes":
+            new Biome("<temp>", relativePath).visit(visitor);
+            break;
+        case "sbb":
+            new SBB("<temp>", relativePath).visit(visitor);
             break;
     }
-    log.log(`Completions length: ${Object.keys(completionsInput).length}`);
 
-    const completions: CompletionItem[] = [];
-    for (const element of Object.values(completionsInput)) {
-        completions.push({
-            label: element.id,
-            data: completions.length,
-        });
-    }
-    return completions;
+    return visitor.completions;
 });
 
-// This handler resolves additional information for the item selected in
-// the completion list.
 connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
     console.log(item);
     return item;
 });
 
-// Make the text document manager listen on the connection
-// for open, change and close text document events
 documents.listen(connection);
-
-// Listen on the connection
 connection.listen();

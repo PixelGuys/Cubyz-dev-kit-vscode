@@ -1,4 +1,4 @@
-import { CompletionItemKind, CompletionItem, CompletionParams } from "vscode-languageserver/node";
+import { CompletionItemKind, CompletionItem } from "vscode-languageserver/node";
 import * as fs from "fs";
 import * as log from "./log";
 import { CompletionVisitor } from "./completions";
@@ -31,64 +31,136 @@ class Asset {
         throw new Error("Method 'getCompletions' must be implemented.");
     }
 }
-class Block extends Asset {
+export class Block extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onBlock(this);
     }
     static getCompletions(): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+        const completions: CompletionItem[] = [];
+        ASSET_INDEX?.blocks.forEach((element) => {
+            completions.push({
+                label: element.id,
+                kind: CompletionItemKind.Field,
+                data: completions.length,
+            });
+        });
+        return completions;
     }
 }
-class BlockTexture extends Asset {
+export class BlockTexture extends Asset {
     static getCompletions(): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+        const completions: CompletionItem[] = [];
+        ASSET_INDEX?.blockTextures.forEach((element) => {
+            completions.push({
+                label: element.id,
+                kind: CompletionItemKind.File,
+                data: completions.length,
+            });
+        });
+        return completions;
     }
 }
-class Item extends Asset {
+export class Item extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onItem(this);
     }
     static getCompletions(): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+        const completions: CompletionItem[] = [];
+        ASSET_INDEX?.items.forEach((element) => {
+            completions.push({
+                label: element.id,
+                kind: CompletionItemKind.Function,
+                data: completions.length,
+            });
+        });
+        return completions;
     }
 }
-class ItemTexture extends Asset {
+export class ItemTexture extends Asset {
     static getCompletions(): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+        const completions: CompletionItem[] = [];
+        ASSET_INDEX?.itemTextures.forEach((element) => {
+            completions.push({
+                label: element.id,
+                kind: CompletionItemKind.File,
+                data: completions.length,
+            });
+        });
+        return completions;
     }
 }
-class Tool extends Asset {
+export class Tool extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onTool(this);
     }
     static getCompletions(): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+        const completions: CompletionItem[] = [];
+        ASSET_INDEX?.tools.forEach((element) => {
+            completions.push({
+                label: element.id,
+                kind: CompletionItemKind.Method,
+                data: completions.length,
+            });
+        });
+        return completions;
     }
 }
-class Biome extends Asset {
+export class Biome extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onBiome(this);
     }
     static getCompletions(): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+        const completions: CompletionItem[] = [];
+        ASSET_INDEX?.biomes.forEach((element) => {
+            completions.push({
+                label: element.id,
+                kind: CompletionItemKind.Interface,
+                data: completions.length,
+            });
+        });
+        return completions;
     }
 }
-class Model extends Asset {
+export class Model extends Asset {
     static getCompletions(): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+        const completions: CompletionItem[] = [];
+        ASSET_INDEX?.models.forEach((element) => {
+            completions.push({
+                label: element.id,
+                kind: CompletionItemKind.Module,
+                data: completions.length,
+            });
+        });
+        return completions;
     }
 }
-class SBB extends Asset {
+export class SBB extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onSBB(this);
     }
     static getCompletions(): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+        const completions: CompletionItem[] = [];
+        ASSET_INDEX?.structureBuildingBlocks.forEach((element) => {
+            completions.push({
+                label: element.id,
+                kind: CompletionItemKind.Class,
+                data: completions.length,
+            });
+        });
+        return completions;
     }
 }
-class Blueprint extends Asset {
+export class Blueprint extends Asset {
     static getCompletions(): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+        const completions: CompletionItem[] = [];
+        ASSET_INDEX?.blueprints.forEach((element) => {
+            completions.push({
+                label: element.id,
+                kind: CompletionItemKind.File,
+                data: completions.length,
+            });
+        });
+        return completions;
     }
 }
 
