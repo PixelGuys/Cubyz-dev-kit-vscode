@@ -190,62 +190,62 @@ export class AssetIndex {
                 index.blocks,
                 "blocks",
                 addon.name,
-                ".zig.zon",
+                ".zig.zon"
             );
             await AssetIndex.registerAsset<BlockTexture>(
                 BlockTexture,
                 index.blockTextures,
                 "blocks/textures",
                 addon.name,
-                ".png",
+                ".png"
             );
             await AssetIndex.registerAsset<Item>(
                 Item,
                 index.items,
                 "items",
                 addon.name,
-                ".zig.zon",
+                ".zig.zon"
             );
             await AssetIndex.registerTextures<ItemTexture>(
                 ItemTexture,
                 index.itemTextures,
                 "items/textures",
-                addon.name,
+                addon.name
             );
             await AssetIndex.registerAsset<Tool>(
                 Tool,
                 index.tools,
                 "tools",
                 addon.name,
-                ".zig.zon",
+                ".zig.zon"
             );
             await AssetIndex.registerAsset<Biome>(
                 Biome,
                 index.biomes,
                 "biomes",
                 addon.name,
-                ".zig.zon",
+                ".zig.zon"
             );
             await AssetIndex.registerAsset<Model>(
                 Model,
                 index.models,
                 "models",
                 addon.name,
-                ".obj",
+                ".obj"
             );
             await AssetIndex.registerAsset<SBB>(
                 SBB,
                 index.structureBuildingBlocks,
                 "sbb",
                 addon.name,
-                ".zig.zon",
+                ".zig.zon"
             );
             await AssetIndex.registerAsset<Blueprint>(
                 Blueprint,
                 index.blueprints,
                 "sbb",
                 addon.name,
-                ".blp",
+                ".blp"
             );
         }
         return index;
@@ -256,7 +256,7 @@ export class AssetIndex {
         storage: AssetT[],
         scope: string,
         addon: string,
-        extension: string,
+        extension: string
     ) {
         const basePath = `assets/${addon}/${scope}/`;
         if (!fs.existsSync(basePath) || !fs.statSync(basePath).isDirectory()) return;
@@ -288,7 +288,7 @@ export class AssetIndex {
         cls: new (id: string, location: string) => AssetT,
         storage: AssetT[],
         scope: string,
-        addon: string,
+        addon: string
     ) {
         const basePath = `assets/${addon}/${scope}/`;
         if (!fs.existsSync(basePath) || !fs.statSync(basePath).isDirectory()) return;

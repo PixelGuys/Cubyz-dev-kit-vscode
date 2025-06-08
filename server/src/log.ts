@@ -1,8 +1,5 @@
 import * as util from "util";
-import {
-    Connection,
-    RemoteConsole,
-} from "vscode-languageserver/node";
+import { Connection, RemoteConsole } from "vscode-languageserver/node";
 
 let _log: Logger | undefined;
 
@@ -17,9 +14,7 @@ export function getLogger(): Logger {
 
 export function initLogger(connection: Connection): void {
     if (_log === undefined) {
-        _log = new Logger(
-            connection.console
-        );
+        _log = new Logger(connection.console);
     }
 }
 
@@ -55,6 +50,6 @@ export class Logger {
         console.info(util.format(...data));
     }
     public debug(...data: Arguments): void {
-       console.debug(util.format(...data));
+        console.debug(util.format(...data));
     }
 }

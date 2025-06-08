@@ -69,6 +69,7 @@ export class Location {
 export class ZonNode {
     start: Location;
     end: Location;
+    parent: ZonNode | null = null;
 
     constructor(start: Location, end: Location) {
         this.start = start;
@@ -80,9 +81,33 @@ export class ZonNode {
     walk(_walker: ZonWalker): void {
         throw new Error("walk method not implemented");
     }
+    equals(other: ZonNode): boolean {
+        return (
+            this.constructor === other.constructor &&
+            this.start.equals(other.start) &&
+            this.end.equals(other.end)
+        );
+    }
 }
 
-type ZonEntry = [ZonNode, ZonNode];
+export class ZonEntry extends ZonNode {
+    key: ZonNode;
+    value: ZonNode;
+
+    constructor(key: ZonNode, value: ZonNode, start: Location, end: Location) {
+        super(start, end);
+        this.key = key;
+        this.key.parent = this;
+        this.value = value;
+        this.value.parent = this;
+    }
+    format(): string {
+        return `${this.key.format()} = ${this.value.format()},`;
+    }
+    walk(walker: ZonWalker): void {
+        walker.on_entry(this);
+    }
+}
 
 export class ZonObject extends ZonNode {
     items: ZonEntry[];
@@ -90,13 +115,16 @@ export class ZonObject extends ZonNode {
     constructor(items: ZonEntry[], start: Location, end: Location) {
         super(start, end);
         this.items = items;
+        this.items.forEach((entry) => {
+            entry.parent = this;
+        });
     }
     format(): string {
         return (
             ".{" +
             this.items
-                .map(([key, value]) => {
-                    return `${key.format()} = ${value.format()}`;
+                .map((entry) => {
+                    return entry.format();
                 })
                 .join(", ") +
             "}"
@@ -124,6 +152,7 @@ export class ZonString extends ZonNode {
 
 export class ZonIdentifier extends ZonNode {
     value: string;
+
     constructor(value: string, start: Location, end: Location) {
         super(start, end);
         this.value = value;
@@ -207,10 +236,13 @@ export class ZonEnd extends ZonNode {
 
 export class ZonWalker {
     on_object(node: ZonObject): void {
-        for (const [key, value] of node.items) {
-            key.walk(this);
-            value.walk(this);
+        for (const entry of node.items) {
+            entry.walk(this);
         }
+    }
+    on_entry(node: ZonEntry): void {
+        node.key.walk(this);
+        node.value.walk(this);
     }
     on_string(_node: ZonString): void {}
     on_identifier(_node: ZonIdentifier): void {}
@@ -243,8 +275,13 @@ export class FindZonNode extends ZonWalker {
         return match;
     }
     on_object(node: ZonObject): void {
-        if(this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
             super.on_object(node);
+        }
+    }
+    on_entry(node: ZonEntry): void {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessThan(node.end)) {
+            super.on_entry(node);
         }
     }
     on_string(node: ZonString): void {
@@ -368,17 +405,21 @@ export class Parser {
 
             if (this.matchAdvance(/^=/)) {
                 const value = this.parseNode();
-                items.push([item, value]);
+                items.push(new ZonEntry(item, value, item.start.clone(), value.end.clone()));
 
                 this.skipWhitespace();
                 if (!this.matchAdvance(/^,/)) break;
                 continue;
             }
 
-            items.push([
-                new ZonNumber(index.toString(), item.start.clone(), item.start.clone()),
-                item,
-            ]);
+            items.push(
+                new ZonEntry(
+                    new ZonNumber(index.toString(), item.start.clone(), item.start.clone()),
+                    item,
+                    item.start.clone(),
+                    item.end.clone()
+                )
+            );
             index++;
 
             this.skipWhitespace();
@@ -479,5 +520,29 @@ export class Parser {
         this.rest = this.rest.slice(m[0].length);
 
         return new ZonNumber(m[0], start, this.location.clone());
+    }
+}
+
+export class Is {
+    static valueOfKey(node: ZonNode, key: string): boolean {
+        if (!(node.parent instanceof ZonEntry)) return false;
+        if (!(node.parent.key instanceof ZonIdentifier)) return false;
+        return node.parent.key.value === key;
+    }
+    static valueOfKeyMatch(node: ZonNode, key: RegExp): boolean {
+        if (!(node.parent instanceof ZonEntry)) return false;
+        if (!(node.parent.key instanceof ZonIdentifier)) return false;
+        return node.parent.key.value.match(key) !== null;
+    }
+    static childOfTopLevelObject(node: ZonNode): boolean {
+        let objectVar = null;
+        if (node instanceof ZonEntry) {
+            objectVar = node.parent;
+        } else if (node.parent instanceof ZonEntry) {
+            objectVar = node.parent.parent;
+        } else {
+            return false;
+        }
+        return objectVar instanceof ZonObject && objectVar.parent === null;
     }
 }

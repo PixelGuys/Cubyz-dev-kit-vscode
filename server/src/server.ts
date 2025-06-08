@@ -14,9 +14,9 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import * as uri from "vscode-uri";
 import * as path from "path";
 import * as zon from "./zon";
-import { getAssetIndex, resetAssetIndex, Block, BlockTexture, Item, ItemTexture, Tool, Biome, Model, SBB, Blueprint } from "./assets";
-import { CompletionVisitor  } from './completions';
-import * as log from './log';
+import { getAssetIndex, resetAssetIndex, Block, Item, Tool, Biome, SBB } from "./assets";
+import { CompletionVisitor } from "./completions";
+import * as log from "./log";
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -35,6 +35,7 @@ connection.onInitialize(() => {
             // Tell the client that this server supports code completion.
             completionProvider: {
                 resolveProvider: true,
+                triggerCharacters: [".", ":", "/", '"', "'"],
             },
         },
     };
@@ -54,6 +55,7 @@ connection.onInitialized(async () => {
     connection.workspace.onDidChangeWorkspaceFolders((_event) => {
         log.log("Workspace folder change event received.");
     });
+    await resetAssetIndex();
     log.log("Initialized Cubyz Dev Kit Language Server");
 });
 
@@ -78,7 +80,6 @@ connection.onDidChangeWatchedFiles(async (_change) => {
     resetAssetIndex();
 });
 
-// This handler provides the initial list of the completion items.
 connection.onCompletion(async (params: CompletionParams) => {
     const workspaceUri = (await connection.workspace.getWorkspaceFolders())?.at(0)?.uri;
     const workspacePath = workspaceUri ? uri.URI.parse(workspaceUri).fsPath : ".";
@@ -134,7 +135,6 @@ connection.onCompletion(async (params: CompletionParams) => {
 });
 
 connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
-    console.log(item);
     return item;
 });
 
