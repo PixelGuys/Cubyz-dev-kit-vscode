@@ -1,6 +1,6 @@
 import { CompletionItem, CompletionParams } from "vscode-languageserver/node";
 import { Block, Item, Tool, Biome, SBB, Model, BlockTexture } from "./assets";
-import { ZonNode, Is } from "./zon";
+import { ZonNode, Is, ZonSyntaxError } from "./zon";
 
 export class CompletionVisitor {
     params: CompletionParams;
@@ -16,10 +16,16 @@ export class CompletionVisitor {
     }
     async onBlock(_asset: Block): Promise<void> {
         if (Is.childOfTopLevelObject(this.node)) {
-            if (Is.valueOfKey(this.node, "model")) {
+            if (Is.entryKeyEqual(this.node, "model")) {
                 this.completions.push(...Model.getCompletions());
-            } else if (Is.valueOfKeyMatch(this.node, /texture.*/)) {
+            } else if (Is.entryKeyMatch(this.node, /texture.*/)) {
                 this.completions.push(...BlockTexture.getCompletions());
+            }
+            if (Is.childOfEntry(this.node)) {
+                if (this.node instanceof ZonSyntaxError) {
+                    console.log(ZonSyntaxError);
+                    console.log(this.node.value);
+                }
             }
         }
     }

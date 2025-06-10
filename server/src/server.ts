@@ -81,6 +81,9 @@ connection.onDidChangeWatchedFiles(async (_change) => {
 });
 
 connection.onCompletion(async (params: CompletionParams) => {
+    console.log("onCompletion");
+    console.log(params.position);
+
     const workspaceUri = (await connection.workspace.getWorkspaceFolders())?.at(0)?.uri;
     const workspacePath = workspaceUri ? uri.URI.parse(workspaceUri).fsPath : ".";
     const documentPath = uri.URI.parse(params.textDocument.uri).fsPath;
@@ -102,12 +105,17 @@ connection.onCompletion(async (params: CompletionParams) => {
 
     const source = documents.get(params.textDocument.uri)?.getText();
     if (!source) return [];
+    console.log(params.textDocument.uri);
+    console.log(source);
 
     const parser = new zon.Parser();
     const ast = parser.parse(source);
+    console.log(ast);
 
     const position = new zon.Location(params.position.character, params.position.line);
     const node = new zon.FindZonNode().find(ast, position);
+    console.log(node);
+
     if (node === null) return [];
     if (!(node instanceof zon.ZonSyntaxError) && !(node instanceof zon.ZonString)) return [];
 
