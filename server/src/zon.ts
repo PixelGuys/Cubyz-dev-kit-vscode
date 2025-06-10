@@ -354,13 +354,16 @@ export class Parser {
             this.syntaxError()
         );
     }
-    private syntaxError(): ZonNull {
+    private syntaxError(): ZonNode {
+        const m = this.rest.match(/.*?(\n\r|\n|$)/);
+        if (!m) throw new Error("Reached unreachable code");
         const start = this.location.clone();
-        this.location.advance(this.rest);
-        const end = this.location.clone();
-        const err = new ZonSyntaxError(this.rest, start, end);
-        this.rest = "";
-        return err;
+        const value = this.rest.slice(0, m[0].length);
+
+        this.location.advance(m[0]);
+        this.rest = this.rest.slice(m[0].length);
+
+        return new ZonSyntaxError(value, start, this.location.clone());
     }
     private skipWhitespace() {
         const m = this.rest.match(/^\s+/);
