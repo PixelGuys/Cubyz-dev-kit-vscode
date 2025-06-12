@@ -81,15 +81,14 @@ connection.onDidChangeWatchedFiles(async (_change) => {
 });
 
 connection.onCompletion(async (params: CompletionParams) => {
-    console.log("onCompletion");
-    console.log(params.position);
+    console.log(`onCompletion at ${params.position.line}:${params.position.character}`);
 
     const workspaceUri = (await connection.workspace.getWorkspaceFolders())?.at(0)?.uri;
     const workspacePath = workspaceUri ? uri.URI.parse(workspaceUri).fsPath : ".";
     const documentPath = uri.URI.parse(params.textDocument.uri).fsPath;
 
     const relativePath = path.relative(workspacePath, documentPath).replace(/\\/g, "/");
-    log.log(`Relative path: ${relativePath}`);
+    log.log(`onCompletion file relative path: ${relativePath}`);
     const pathSplit = relativePath.split("/");
 
     if (pathSplit.length < 4) return [];
@@ -106,7 +105,6 @@ connection.onCompletion(async (params: CompletionParams) => {
     const source = documents.get(params.textDocument.uri)?.getText();
     if (!source) return [];
     console.log(params.textDocument.uri);
-    console.log(source);
 
     const parser = new zon.Parser();
     const ast = parser.parse(source);

@@ -276,11 +276,13 @@ export class FindZonNode extends ZonWalker {
     }
     on_object(node: ZonObject): void {
         if (this.position.greaterOrEqual(node.start) && this.position.lessOrEqual(node.end)) {
+            this.match = node;
             super.on_object(node);
         }
     }
     on_entry(node: ZonEntry): void {
         if (this.position.greaterOrEqual(node.start) && this.position.lessOrEqual(node.end)) {
+            this.match = node;
             super.on_entry(node);
         }
     }
@@ -544,5 +546,8 @@ export class Is {
             return false;
         }
         return objectVar instanceof ZonObject && objectVar.parent === null;
+    }
+    static topLevelObject(node: ZonNode): boolean {
+        return node instanceof ZonObject && node.parent === null;
     }
 }

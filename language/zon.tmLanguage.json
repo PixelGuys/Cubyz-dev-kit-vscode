@@ -5,6 +5,7 @@
     "patterns": [
         { "include": "#null" },
         { "include": "#bool" },
+        { "include": "#hex_int" },
         { "include": "#number" },
         { "include": "#string" },
         { "include": "#identifier" }
@@ -17,6 +18,10 @@
         "bool": {
             "name": "keyword",
             "match": "(true|false)"
+        },
+        "hex_int": {
+            "name": "constant.numeric",
+            "match": "0[xX][0-9a-fA-F]+"
         },
         "number": {
             "name": "constant.numeric",

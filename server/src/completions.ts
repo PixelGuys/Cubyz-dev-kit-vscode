@@ -1,5 +1,5 @@
 import { CompletionItem, CompletionItemKind, CompletionParams } from "vscode-languageserver/node";
-import { Block, Item, Tool, Biome, SBB, Model, BlockTexture } from "./assets";
+import { Block, Item, Tool, Biome, SBB, Model, BlockTexture, ItemTexture } from "./assets";
 import { ZonNode, Is, ZonSyntaxError, ZonIdentifier } from "./zon";
 
 export class CompletionVisitor {
@@ -15,40 +15,48 @@ export class CompletionVisitor {
         this.node = node;
     }
     async onBlock(_asset: Block): Promise<void> {
+        const topLevelKeys = [
+            ".rotation",
+            ".blockHealth",
+            ".blockResistance",
+            ".tags",
+            ".emittedLight",
+            ".absorbedLight",
+            ".degradable",
+            ".selectable",
+            ".replacable",
+            ".gui",
+            "transparent",
+            ".collide",
+            ".alwaysViewThrough",
+            ".viewThrough",
+            ".hasBackFace",
+            ".friction",
+            ".allowOres",
+            ".tickEvent",
+            ".touchFunction",
+            ".blockEntity",
+            ".ore",
+        ];
         if (Is.childOfTopLevelObject(this.node)) {
             if (Is.entryKeyEqual(this.node, "model")) {
                 this.completions.push(...Model.getCompletions());
-            } else if (Is.entryKeyMatch(this.node, /texture.*/)) {
+                return;
+            }
+            if (Is.entryKeyMatch(this.node, /texture.*/)) {
                 this.completions.push(...BlockTexture.getCompletions());
+                return;
             }
             if (Is.childOfEntry(this.node)) {
                 if (this.node instanceof ZonSyntaxError || this.node instanceof ZonIdentifier) {
-                    const identifiers = [
-                        ".rotation",
-                        ".blockHealth",
-                        ".blockResistance",
-                        ".tags",
-                        ".emittedLight",
-                        ".absorbedLight",
-                        ".degradable",
-                        ".selectable",
-                        ".replacable",
-                        ".gui",
-                        "transparent",
-                        ".collide",
-                        ".alwaysViewThrough",
-                        ".viewThrough",
-                        ".hasBackFace",
-                        ".friction",
-                        ".allowOres",
-                        ".tickEvent",
-                        ".touchFunction",
-                        ".blockEntity",
-                        ".ore",
-                    ];
-                    this.addCompletionsFromArray(identifiers);
+                    this.addCompletionsFromArray(topLevelKeys);
+                    return;
                 }
             }
+        }
+        if (Is.topLevelObject(this.node)) {
+            this.addCompletionsFromArray(topLevelKeys);
+            return;
         }
     }
     addCompletionsFromArray(symbols: string[]): void {
@@ -59,7 +67,33 @@ export class CompletionVisitor {
             });
         });
     }
-    async onItem(_asset: Item): Promise<void> {}
+    async onItem(_asset: Item): Promise<void> {
+        const topLevelKeys = [
+            ".name",
+            ".tags",
+            ".stackSize",
+            ".material",
+            ".block",
+            ".texture",
+            ".foodValue",
+        ];
+        if (Is.childOfTopLevelObject(this.node)) {
+            if (Is.entryKeyEqual(this.node, "texture")) {
+                this.completions.push(...ItemTexture.getCompletions());
+                return;
+            }
+            if (Is.childOfEntry(this.node)) {
+                if (this.node instanceof ZonSyntaxError || this.node instanceof ZonIdentifier) {
+                    this.addCompletionsFromArray(topLevelKeys);
+                    return;
+                }
+            }
+        }
+        if (Is.topLevelObject(this.node)) {
+            this.addCompletionsFromArray(topLevelKeys);
+            return;
+        }
+    }
     async onTool(_asset: Tool): Promise<void> {}
     async onBiome(_asset: Biome): Promise<void> {}
     async onSBB(_asset: SBB): Promise<void> {}
