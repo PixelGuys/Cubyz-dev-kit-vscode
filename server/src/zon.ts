@@ -90,6 +90,43 @@ export class ZonNode {
     }
 }
 
+export class ZonEmpty extends ZonNode {
+    constructor(start: Location, end: Location) {
+        super(start, end);
+    }
+    format(): string {
+        return ".{}";
+    }
+    walk(walker: ZonWalker): void {
+        walker.on_empty(this);
+    }
+}
+
+export class ZonArray extends ZonNode {
+    items: ZonNode[];
+    constructor(items: ZonNode[], start: Location, end: Location) {
+        super(start, end);
+        this.items = items;
+        this.items.forEach((item) => {
+            item.parent = this;
+        });
+    }
+    format(): string {
+        return (
+            ".{" +
+            this.items
+                .map((item) => {
+                    return item.format();
+                })
+                .join(", ") +
+            "}"
+        );
+    }
+    walk(walker: ZonWalker): void {
+        walker.on_array(this);
+    }
+}
+
 export class ZonEntry extends ZonNode {
     key: ZonNode;
     value: ZonNode;
@@ -210,10 +247,12 @@ export class ZonNull extends ZonNode {
 }
 export class ZonSyntaxError extends ZonNode {
     value: string;
+    description: string;
 
-    constructor(value: string, start: Location, end: Location) {
+    constructor(value: string, start: Location, end: Location, description?: string) {
         super(start, end);
         this.value = value;
+        this.description = description || "Syntax error";
     }
     format(): string {
         return `${this.value}`;
@@ -235,6 +274,12 @@ export class ZonEnd extends ZonNode {
 }
 
 export class ZonWalker {
+    on_empty(_node: ZonEmpty): void {}
+    on_array(_node: ZonArray): void {
+        for (const item of _node.items) {
+            item.walk(this);
+        }
+    }
     on_object(node: ZonObject): void {
         for (const entry of node.items) {
             entry.walk(this);
@@ -273,6 +318,17 @@ export class FindZonNode extends ZonWalker {
         this.match = null;
 
         return match;
+    }
+    on_empty(_node: ZonEmpty): void {
+        if (this.position.greaterOrEqual(_node.start) && this.position.lessOrEqual(_node.end)) {
+            this.match = _node;
+        }
+    }
+    on_array(node: ZonArray): void {
+        if (this.position.greaterOrEqual(node.start) && this.position.lessOrEqual(node.end)) {
+            this.match = node;
+            super.on_array(node);
+        }
     }
     on_object(node: ZonObject): void {
         if (this.position.greaterOrEqual(node.start) && this.position.lessOrEqual(node.end)) {
@@ -352,7 +408,7 @@ export class Parser {
             this.parseString() ??
             this.parseAdvancedName() ??
             this.parseSimpleName() ??
-            this.parseObject() ??
+            this.parseObjectLike() ??
             this.syntaxError()
         );
     }
@@ -374,48 +430,90 @@ export class Parser {
             this.rest = this.rest.slice(m[0].length);
         }
     }
-    private parseObject(): ZonNode | undefined {
+    private parseObjectLike(): ZonNode | undefined {
+        {
+            const m = this.rest.match(/^\.{\s*}/);
+            if (m) return this.parseEmpty();
+        }
+        {
+            const m = this.rest.match(/^\.{[^}]+=/);
+            if (m) return this.parseObject();
+            return this.parseArray();
+        }
+    }
+    private parseEmpty(): ZonNode | undefined {
         const start = this.location.clone();
-        let index = 0;
-        const items: ZonEntry[] = [];
+        const m = this.matchAdvance(/^\.\{\s*}/);
+        if (!m) return undefined;
+        return new ZonEmpty(start, this.location.clone());
+    }
+    private parseArray(): ZonNode | undefined {
+        const start = this.location.clone();
+        const items: ZonNode[] = [];
 
         if (!this.matchAdvance(/^\.\{/)) return undefined;
-        this.skipWhitespace();
 
         while (true) {
             this.skipWhitespace();
+
+            if (this.rest.length === 0) break;
             if (this.peek(/^}/)) break;
 
             const item = this.parseNode();
-            this.skipWhitespace();
-
             if (item instanceof ZonEnd) break;
 
+            items.push(item);
+
+            if (item instanceof ZonSyntaxError) continue;
+
+            this.skipWhitespace();
+            this.matchAdvance(/^,/);
+        }
+
+        this.skipWhitespace();
+        this.matchAdvance(/^}/);
+
+        return new ZonArray(items, start, this.location.clone());
+    }
+    private parseObject(): ZonNode | undefined {
+        const start = this.location.clone();
+        const items: ZonEntry[] = [];
+
+        if (!this.matchAdvance(/^\.\{/)) return undefined;
+
+        while (true) {
+            this.skipWhitespace();
+
+            if (this.rest.length === 0) break;
             if (this.peek(/^}/)) break;
 
-            if (this.matchAdvance(/^=/)) {
-                const value = this.parseNode();
-                items.push(new ZonEntry(item, value, item.start.clone(), value.end.clone()));
+            const key = this.parseNode();
+            if (key instanceof ZonEnd) break;
 
-                this.skipWhitespace();
-                if (!this.matchAdvance(/^,/)) break;
+            this.skipWhitespace();
+            this.matchAdvance(/^=/);
+            this.skipWhitespace();
+
+            if (key instanceof ZonSyntaxError || this.rest.length === 0 || this.peek(/^}/)) {
+                items.push(
+                    new ZonEntry(
+                        key,
+                        new ZonSyntaxError("", this.location.clone(), this.location.clone()),
+                        key.start.clone(),
+                        this.location.clone()
+                    )
+                );
                 continue;
             }
 
-            items.push(
-                new ZonEntry(
-                    new ZonNumber(index.toString(), item.start.clone(), item.start.clone()),
-                    item,
-                    item.start.clone(),
-                    item.end.clone()
-                )
-            );
-            index++;
+            const value = this.parseNode();
+            items.push(new ZonEntry(key, value, key.start.clone(), value.end.clone()));
+
+            if (value instanceof ZonEnd) break;
+            if (value instanceof ZonSyntaxError) continue;
 
             this.skipWhitespace();
-            if (!this.matchAdvance(/^,/)) break;
-
-            continue;
+            this.matchAdvance(/^,/);
         }
 
         this.skipWhitespace();
