@@ -50,7 +50,7 @@ export class Location {
     }
     advance(str: string) {
         for (const c of str) {
-            if (c == LINE_FEED) {
+            if (c == "\n") {
                 this.advanceLine();
             } else {
                 this.advanceColumn();
@@ -379,8 +379,6 @@ export class FindZonNode extends ZonWalker {
     }
 }
 
-const LINE_FEED = "\n";
-
 export class Parser {
     location: Location;
     source: string;
@@ -575,7 +573,7 @@ export class Parser {
                 break;
             }
             if (this.rest[count] === "\\") escaped = !escaped;
-            if ((this.rest[count] === quote && !escaped) || this.rest[count] === LINE_FEED) {
+            if ((this.rest[count] === quote && !escaped) || this.rest[count] === "\n") {
                 string = this.rest.slice(0, count);
                 this.location.advance(string);
                 this.location.advanceColumn();
