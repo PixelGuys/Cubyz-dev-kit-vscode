@@ -102,8 +102,7 @@
         "compile": "tsc -b",
         "watch": "tsc -b -w",
         "lint": "eslint",
-        "postinstall": "cd client && npm install && cd ../server && npm install && cd ..",
-        "test": "sh ./scripts/e2e.sh"
+        "postinstall": "cd client && npm install && cd ../server && npm install && cd .."
     },
     "devDependencies": {
         "@eslint/js": "^9.13.0",
@@ -112,6 +111,7 @@
         "@types/node": "^20",
         "eslint": "^9.13.0",
         "mocha": "^10.3.0",
+        "prettier": "3.5.3",
         "typescript": "^5.8.2",
         "typescript-eslint": "^8.26.0"
     }

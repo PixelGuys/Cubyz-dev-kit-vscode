@@ -1,8 +1,13 @@
 {
-	"editor.insertSpaces": false,
-	"typescript.tsc.autoDetect": "off",
-	"typescript.preferences.quoteStyle": "single",
-	"editor.codeActionsOnSave": {
-		"source.fixAll.eslint": "explicit"
-	}
+    "editor.insertSpaces": false,
+    "typescript.tsc.autoDetect": "off",
+    "typescript.preferences.quoteStyle": "double",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "always",
+        "editor.action.formatDocument": "always"
+    },
+    "prettier.tabWidth": 4,
+    "[jsonc]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+    "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+    "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
 }

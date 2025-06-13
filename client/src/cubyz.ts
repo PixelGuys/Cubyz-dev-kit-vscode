@@ -205,10 +205,16 @@ class CompilerInfo {
         log.info(`Progress finished, cleared: ${dirPath}.`);
     }
     async clearCache(): Promise<void> {
-        this.clearDirWithProgress(`${this.workspacePath}/.zig-cache`, "Clearing Zig cache directory");
+        this.clearDirWithProgress(
+            `${this.workspacePath}/.zig-cache`,
+            "Clearing Zig cache directory"
+        );
     }
     async clearCompiler(): Promise<void> {
-        await this.clearDirWithProgress(`${this.workspacePath}/compiler`, "Clearing Zig compiler directory");
+        await this.clearDirWithProgress(
+            `${this.workspacePath}/compiler`,
+            "Clearing Zig compiler directory"
+        );
     }
     async clearAll(): Promise<void> {
         await this.clearOut();
