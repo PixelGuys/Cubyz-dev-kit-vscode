@@ -1,6 +1,6 @@
 import { CompletionItem, CompletionItemKind, CompletionParams } from "vscode-languageserver/node";
 import { Block, Item, Tool, Biome, SBB, Model, BlockTexture, ItemTexture } from "./assets";
-import { ZonNode, Is, ZonSyntaxError, ZonIdentifier } from "./zon";
+import { ZonNode, Is, ZonSyntaxError, ZonIdentifier, ZonEntry, ZonObject } from "./zon";
 
 export class CompletionVisitor {
     params: CompletionParams;
@@ -77,6 +77,13 @@ export class CompletionVisitor {
             ".texture",
             ".foodValue",
         ];
+        const materialKeys = [
+            ".density",
+            ".elasticity",
+            ".hardness",
+            ".textureRoughness",
+            ".colors",
+        ];
         if (Is.childOfTopLevelObject(this.node)) {
             if (Is.entryKeyEqual(this.node, "texture")) {
                 this.completions.push(...ItemTexture.getCompletions());
@@ -92,6 +99,25 @@ export class CompletionVisitor {
         if (Is.topLevelObject(this.node)) {
             this.addCompletionsFromArray(topLevelKeys);
             return;
+        }
+        if (this.node instanceof ZonSyntaxError || this.node instanceof ZonIdentifier) {
+            if (this.node.parent instanceof ZonEntry) {
+                const materialsEntry = this.node.parent;
+                if (materialsEntry.parent instanceof ZonObject) {
+                    const materialsObject = materialsEntry.parent;
+                    if (materialsObject.parent instanceof ZonEntry) {
+                        const itemEntry = materialsObject.parent;
+                        if (
+                            (itemEntry.key instanceof ZonIdentifier ||
+                                itemEntry.key instanceof ZonSyntaxError) &&
+                            itemEntry.key.value === "material"
+                        ) {
+                            this.addCompletionsFromArray(materialKeys);
+                            return;
+                        }
+                    }
+                }
+            }
         }
     }
     async onTool(_asset: Tool): Promise<void> {}
