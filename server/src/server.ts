@@ -111,13 +111,15 @@ connection.onCompletion(async (params: CompletionParams) => {
     console.log(ast);
 
     const position = new zon.Location(params.position.character, params.position.line);
-    const node = new zon.FindZonNode().find(ast, position);
+    const nodeFinder = new zon.FindZonNode();
+    const result = nodeFinder.find(ast, position);
+    if (result === null) return [];
+
+    const [node, nodePath] = result;
     console.log(node);
 
-    if (node === null) return [];
-    if (!(node instanceof zon.ZonSyntaxError) && !(node instanceof zon.ZonString)) return [];
-
-    const visitor = new CompletionVisitor(params, ast, node);
+    const visitor = new CompletionVisitor(params, ast, node, nodePath);
+    console.log(`Collecting completions for scope ${scope}`);
 
     switch (scope) {
         case "blocks":
@@ -137,6 +139,7 @@ connection.onCompletion(async (params: CompletionParams) => {
             break;
     }
 
+    console.log(`Finished collecting completions: ${visitor.completions.length} items found.`);
     return visitor.completions;
 });
 

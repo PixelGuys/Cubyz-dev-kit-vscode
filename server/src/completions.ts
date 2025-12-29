@@ -1,18 +1,31 @@
 import { CompletionItem, CompletionItemKind, CompletionParams } from "vscode-languageserver/node";
 import { Block, Item, Tool, Biome, SBB, Model, BlockTexture, ItemTexture } from "./assets";
-import { ZonNode, Is, ZonSyntaxError, ZonIdentifier, ZonEntry, ZonObject } from "./zon";
+import {
+    ZonNode,
+    Is,
+    ZonSyntaxError,
+    ZonIdentifier,
+    ZonEntry,
+    ZonObject,
+    ZonEmpty,
+    ZonArray,
+    ZonNodePath,
+    ZonString,
+} from "./zon";
 
 export class CompletionVisitor {
     params: CompletionParams;
     completions: CompletionItem[];
     ast: ZonNode;
     node: ZonNode;
+    nodePath: ZonNodePath;
 
-    constructor(params: CompletionParams, ast: ZonNode, node: ZonNode) {
+    constructor(params: CompletionParams, ast: ZonNode, node: ZonNode, nodePath: ZonNodePath) {
         this.params = params;
         this.completions = [];
         this.ast = ast;
         this.node = node;
+        this.nodePath = nodePath;
     }
     async onBlock(_asset: Block): Promise<void> {
         const topLevelKeys = [
@@ -25,41 +38,120 @@ export class CompletionVisitor {
             ".degradable",
             ".selectable",
             ".replacable",
-            ".gui",
-            "transparent",
+            ".transparent",
             ".collide",
             ".alwaysViewThrough",
             ".viewThrough",
             ".hasBackFace",
             ".friction",
+            ".bounciness",
+            ".density",
+            ".terminalVelocity",
+            ".mobility",
             ".allowOres",
-            ".tickEvent",
-            ".touchFunction",
             ".blockEntity",
             ".ore",
+            ".model",
+            ".texture_bottom",
+            ".texture_top",
+            ".texture_right",
+            ".texture_left",
+            ".texture_front",
+            ".texture_back",
         ];
-        if (Is.childOfTopLevelObject(this.node)) {
-            if (Is.entryKeyEqual(this.node, "model")) {
-                this.completions.push(...Model.getCompletions());
-                return;
-            }
-            if (Is.entryKeyMatch(this.node, /texture.*/)) {
-                this.completions.push(...BlockTexture.getCompletions());
-                return;
-            }
-            if (Is.childOfEntry(this.node)) {
-                if (this.node instanceof ZonSyntaxError || this.node instanceof ZonIdentifier) {
-                    this.addCompletionsFromArray(topLevelKeys);
-                    return;
-                }
-            }
+
+        for (let i = 0; i < 16; i++) {
+            topLevelKeys.push(`.texture${i}`);
         }
-        if (Is.topLevelObject(this.node)) {
-            this.addCompletionsFromArray(topLevelKeys);
+
+        const node = this.node;
+
+        // Top level completions
+        if (node.parent === null) {
+            if (node instanceof ZonObject || node instanceof ZonEmpty || node instanceof ZonArray) {
+                return this.addCompletions(topLevelKeys);
+            }
             return;
         }
+
+        if (
+            this.nodePath.match([
+                (x) => x instanceof ZonObject,
+                (x) => {
+                    const isZonEntry = x instanceof ZonEntry;
+                    if (!isZonEntry) return false;
+
+                    const isKey = node === x.key;
+                    if (!isKey) return false;
+
+                    return true;
+                },
+                (x) => x instanceof ZonIdentifier || x instanceof ZonSyntaxError,
+            ])
+        ) {
+            return this.addCompletionsLike(topLevelKeys, (node as ZonIdentifier).value);
+        }
+
+        const completeTopLevelValueConditions = (keyRegex: RegExp) => [
+            (x: ZonNode) => x instanceof ZonObject,
+            (x: ZonNode) => {
+                const isZonEntry = x instanceof ZonEntry;
+                if (!isZonEntry) return false;
+
+                const isValue = node === x.value;
+                if (!isValue) return false;
+
+                const isKeyStringLike =
+                    x.key instanceof ZonIdentifier || x.key instanceof ZonSyntaxError;
+                if (!isKeyStringLike) return false;
+
+                const isKeyModel = (x.key as ZonIdentifier).value.match(keyRegex);
+                if (!isKeyModel) return false;
+
+                return true;
+            },
+            (x: ZonNode) => x instanceof ZonString || x instanceof ZonSyntaxError,
+        ];
+
+        if (this.nodePath.match(completeTopLevelValueConditions(/\.?model/))) {
+            const completions = Model.getCompletions((m: Model) =>
+                m.id.startsWith((node as ZonString).value),
+            );
+            this.completions.push(...completions);
+            return;
+        }
+
+        if (
+            this.nodePath.match(
+                completeTopLevelValueConditions(
+                    /\.?(texture\d{1,2}|texture_texture_bottom|texture_top|texture_right|texture_left|texture_front|texture_back)/,
+                ),
+            )
+        ) {
+            const completions = BlockTexture.getCompletions((m: Model) =>
+                m.id.startsWith((node as ZonString).value),
+            );
+            this.completions.push(...completions);
+            return;
+        }
+
+        // if (node instanceof ZonEntry && node.parent instanceof ZonObject && node.parent.parent === null) {
+        //     this.
+        // }
+
+        // Top level key-value completions
+        if (node.parent instanceof ZonEntry && node.parent.parent === null) {
+            if (node instanceof ZonSyntaxError || node instanceof ZonIdentifier) {
+                return this.addCompletionsLike(topLevelKeys, node.value);
+            }
+        }
     }
-    addCompletionsFromArray(symbols: string[]): void {
+    addCompletionsLike(symbols: string[], like: string): void {
+        return this.addCompletions(
+            symbols.filter((item) => item.startsWith(like) || item.substring(1).startsWith(like)),
+        );
+    }
+    addCompletions(symbols: string[]): void {
         symbols.forEach((symbol) => {
             this.completions.push({
                 label: symbol,
@@ -84,20 +176,20 @@ export class CompletionVisitor {
             ".textureRoughness",
             ".colors",
         ];
-        if (Is.childOfTopLevelObject(this.node)) {
+        if (Is.topLevelObject(this.node)) {
             if (Is.entryKeyEqual(this.node, "texture")) {
                 this.completions.push(...ItemTexture.getCompletions());
                 return;
             }
             if (Is.childOfEntry(this.node)) {
                 if (this.node instanceof ZonSyntaxError || this.node instanceof ZonIdentifier) {
-                    this.addCompletionsFromArray(topLevelKeys);
+                    this.addCompletions(topLevelKeys);
                     return;
                 }
             }
         }
         if (Is.topLevelObject(this.node)) {
-            this.addCompletionsFromArray(topLevelKeys);
+            this.addCompletions(topLevelKeys);
             return;
         }
         if (this.node instanceof ZonSyntaxError || this.node instanceof ZonIdentifier) {
@@ -112,7 +204,7 @@ export class CompletionVisitor {
                                 itemEntry.key instanceof ZonSyntaxError) &&
                             itemEntry.key.value === "material"
                         ) {
-                            this.addCompletionsFromArray(materialKeys);
+                            this.addCompletions(materialKeys);
                             return;
                         }
                     }
