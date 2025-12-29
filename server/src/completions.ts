@@ -28,40 +28,54 @@ export class CompletionVisitor {
         this.nodePath = nodePath;
     }
     async onBlock(_asset: Block): Promise<void> {
-        const topLevelKeys = [
-            ".rotation",
-            ".blockHealth",
-            ".blockResistance",
-            ".tags",
-            ".emittedLight",
-            ".absorbedLight",
-            ".degradable",
-            ".selectable",
-            ".replacable",
-            ".transparent",
-            ".collide",
-            ".alwaysViewThrough",
-            ".viewThrough",
-            ".hasBackFace",
-            ".friction",
-            ".bounciness",
-            ".density",
-            ".terminalVelocity",
-            ".mobility",
-            ".allowOres",
-            ".blockEntity",
-            ".ore",
-            ".model",
-            ".texture_bottom",
-            ".texture_top",
-            ".texture_right",
-            ".texture_left",
-            ".texture_front",
-            ".texture_back",
-        ];
+        const completeTexture = () => {
+            const completions = BlockTexture.getCompletions((m: Model) =>
+                m.id.startsWith((node as ZonString).value),
+            );
+            this.completions.push(...completions);
+            return;
+        };
+
+        const topLevelKeys: Record<string, () => void> = {
+            ".rotation": () => {},
+            ".blockHealth": () => {},
+            ".blockResistance": () => {},
+            ".tags": () => {},
+            ".emittedLight": () => {},
+            ".absorbedLight": () => {},
+            ".degradable": () => {},
+            ".selectable": () => {},
+            ".replacable": () => {},
+            ".transparent": () => {},
+            ".collide": () => {},
+            ".alwaysViewThrough": () => {},
+            ".viewThrough": () => {},
+            ".hasBackFace": () => {},
+            ".friction": () => {},
+            ".bounciness": () => {},
+            ".density": () => {},
+            ".terminalVelocity": () => {},
+            ".mobility": () => {},
+            ".allowOres": () => {},
+            ".blockEntity": () => {},
+            ".ore": () => {},
+            ".model": () => {
+                const completions = Model.getCompletions((m: Model) =>
+                    m.id.startsWith((node as ZonString).value),
+                );
+                this.completions.push(...completions);
+                return;
+            },
+            ".texture_bottom": completeTexture,
+            ".texture_top": completeTexture,
+            ".texture_right": completeTexture,
+            ".texture_left": completeTexture,
+            ".texture_front": completeTexture,
+            ".texture_back": completeTexture,
+        };
 
         for (let i = 0; i < 16; i++) {
-            topLevelKeys.push(`.texture${i}`);
+            topLevelKeys[`.texture${i}`] = completeTexture;
         }
 
         const node = this.node;
@@ -69,7 +83,7 @@ export class CompletionVisitor {
         // Top level completions
         if (node.parent === null) {
             if (node instanceof ZonObject || node instanceof ZonEmpty || node instanceof ZonArray) {
-                return this.addCompletions(topLevelKeys);
+                return this.addCompletions(Object.keys(topLevelKeys), { detail: "option" });
             }
             return;
         }
@@ -89,10 +103,16 @@ export class CompletionVisitor {
                 (x) => x instanceof ZonIdentifier || x instanceof ZonSyntaxError,
             ])
         ) {
-            return this.addCompletionsLike(topLevelKeys, (node as ZonIdentifier).value);
+            return this.addCompletionsLike(
+                Object.keys(topLevelKeys),
+                (node as ZonIdentifier).value,
+                {
+                    detail: "option",
+                },
+            );
         }
 
-        const completeTopLevelValueConditions = (keyRegex: RegExp) => [
+        const completeTopLevelValueConditions = (predicate: (keyName: string) => boolean) => [
             (x: ZonNode) => x instanceof ZonObject,
             (x: ZonNode) => {
                 const isZonEntry = x instanceof ZonEntry;
@@ -105,57 +125,39 @@ export class CompletionVisitor {
                     x.key instanceof ZonIdentifier || x.key instanceof ZonSyntaxError;
                 if (!isKeyStringLike) return false;
 
-                const isKeyModel = (x.key as ZonIdentifier).value.match(keyRegex);
-                if (!isKeyModel) return false;
+                const isKeyMatch = predicate((x.key as ZonIdentifier).value);
+                if (!isKeyMatch) return false;
 
                 return true;
             },
             (x: ZonNode) => x instanceof ZonString || x instanceof ZonSyntaxError,
         ];
 
-        if (this.nodePath.match(completeTopLevelValueConditions(/\.?model/))) {
-            const completions = Model.getCompletions((m: Model) =>
-                m.id.startsWith((node as ZonString).value),
-            );
-            this.completions.push(...completions);
-            return;
-        }
-
-        if (
-            this.nodePath.match(
-                completeTopLevelValueConditions(
-                    /\.?(texture\d{1,2}|texture_texture_bottom|texture_top|texture_right|texture_left|texture_front|texture_back)/,
-                ),
-            )
-        ) {
-            const completions = BlockTexture.getCompletions((m: Model) =>
-                m.id.startsWith((node as ZonString).value),
-            );
-            this.completions.push(...completions);
-            return;
-        }
-
-        // if (node instanceof ZonEntry && node.parent instanceof ZonObject && node.parent.parent === null) {
-        //     this.
-        // }
-
-        // Top level key-value completions
-        if (node.parent instanceof ZonEntry && node.parent.parent === null) {
-            if (node instanceof ZonSyntaxError || node instanceof ZonIdentifier) {
-                return this.addCompletionsLike(topLevelKeys, node.value);
+        for (const key in topLevelKeys) {
+            if (
+                this.nodePath.match(
+                    completeTopLevelValueConditions(
+                        (keyName) =>
+                            key.startsWith(keyName) || key.substring(1).startsWith(keyName),
+                    ),
+                )
+            ) {
+                topLevelKeys[key]();
             }
         }
     }
-    addCompletionsLike(symbols: string[], like: string): void {
+    addCompletionsLike(symbols: string[], like: string, extra: object = {}): void {
         return this.addCompletions(
             symbols.filter((item) => item.startsWith(like) || item.substring(1).startsWith(like)),
+            extra,
         );
     }
-    addCompletions(symbols: string[]): void {
+    addCompletions(symbols: string[], extra: object = {}): void {
         symbols.forEach((symbol) => {
             this.completions.push({
                 label: symbol,
                 kind: CompletionItemKind.Constant,
+                ...extra,
             });
         });
     }
