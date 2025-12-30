@@ -121,6 +121,9 @@ export class ZonNode {
     isZonEnd(): boolean {
         return false;
     }
+    getValueString(): string | null {
+        return null;
+    }
 }
 
 /// Represents an empty object / array where syntax doesn't allow for differentiating between them.
@@ -216,6 +219,9 @@ export class ZonObject extends ZonNode {
     isZonObject(): boolean {
         return true;
     }
+    getKeyStrings(): string[] {
+        return this.items.map((x) => x.getValueString()).filter((x) => x != null);
+    }
 }
 
 export class ZonString extends ZonNode {
@@ -233,6 +239,9 @@ export class ZonString extends ZonNode {
     }
     isZonString(): boolean {
         return true;
+    }
+    getValueString(): string | null {
+        return this.value;
     }
 }
 
@@ -256,6 +265,9 @@ export class ZonIdentifier extends ZonNode {
     isZonIdentifier(): boolean {
         return true;
     }
+    getValueString(): string | null {
+        return this.value;
+    }
 }
 
 export class ZonNumber extends ZonNode {
@@ -273,6 +285,9 @@ export class ZonNumber extends ZonNode {
     }
     isZonNumber(): boolean {
         return true;
+    }
+    getValueString(): string | null {
+        return this.value;
     }
 }
 export class ZonBoolean extends ZonNode {
@@ -323,6 +338,12 @@ export class ZonSyntaxError extends ZonNode {
     }
     isZonSyntaxError(): boolean {
         return true;
+    }
+    getValueString(): string | null {
+        let value = this.value.trim();
+        if (value.startsWith(".")) return value.substring(1);
+        value = value.replace(/,$/, "");
+        return value;
     }
 }
 export class ZonEnd extends ZonNode {
@@ -619,13 +640,14 @@ export class Parser {
 
             this.skipWhitespace();
             this.matchAdvance(/^=/);
+            const locationAfterEquals = this.location.clone();
             this.skipWhitespace();
 
             if (key instanceof ZonSyntaxError || this.rest.length === 0 || this.peek(/^}/)) {
                 items.push(
                     new ZonEntry(
                         key,
-                        new ZonSyntaxError("", this.location.clone(), this.location.clone()),
+                        new ZonSyntaxError("", locationAfterEquals, this.location.clone()),
                         key.start.clone(),
                         this.location.clone(),
                     ),

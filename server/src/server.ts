@@ -117,6 +117,7 @@ connection.onCompletion(async (params: CompletionParams) => {
 
     const [node, nodePath] = result;
     console.log(node);
+    console.log(nodePath);
 
     const visitor = new CompletionVisitor(params, ast, node, nodePath);
     console.log(`Collecting completions for scope ${scope}`);
