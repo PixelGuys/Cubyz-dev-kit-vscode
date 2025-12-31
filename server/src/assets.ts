@@ -1,4 +1,4 @@
-import { CompletionItemKind, CompletionItem } from "vscode-languageserver/node";
+import { CompletionItemKind, CompletionItem, InsertTextMode } from "vscode-languageserver/node";
 import * as fs from "fs";
 import * as log from "./log";
 import { CompletionVisitor } from "./completions";
@@ -16,7 +16,14 @@ export async function resetAssetIndex(): Promise<void> {
     ASSET_INDEX = await AssetIndex.new();
 }
 
-class Asset {
+abstract class AssetInterface {
+    abstract id: string;
+    abstract location: string;
+}
+
+type AssetInterfaceConstructor<T extends AssetInterface> = new (id: string, location: string) => T;
+
+class Asset implements AssetInterface {
     id: string;
     location: string;
 
@@ -27,18 +34,24 @@ class Asset {
     async visit(_provider: CompletionVisitor): Promise<void> {
         throw new Error("Method 'visit' must be implemented.");
     }
-    static getCompletions(_filter: (asset: Asset) => boolean = () => true): CompletionItem[] {
-        throw new Error("Method 'getCompletions' must be implemented.");
+    static all(): Asset[] {
+        throw new Error("Static method 'all' must be implemented.");
+    }
+    static getCompletions(_condition: (asset: Asset) => boolean = () => true): CompletionItem[] {
+        throw new Error("Static method 'getCompletions' must be implemented.");
     }
 }
 export class Block extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onBlock(this);
     }
-    static getCompletions(_filter: (asset: Block) => boolean = () => true): CompletionItem[] {
+    static all(): Block[] {
+        return ASSET_INDEX?.blocks ?? [];
+    }
+    static getCompletions(condition: (asset: Block) => boolean = () => true): CompletionItem[] {
         const completions: CompletionItem[] = [];
         ASSET_INDEX?.blocks.forEach((element) => {
-            if (_filter(element))
+            if (condition(element))
                 completions.push({
                     label: element.id,
                     kind: CompletionItemKind.Class,
@@ -50,12 +63,15 @@ export class Block extends Asset {
     }
 }
 export class BlockTexture extends Asset {
+    static all(): BlockTexture[] {
+        return ASSET_INDEX?.blockTextures ?? [];
+    }
     static getCompletions(
-        _filter: (asset: BlockTexture) => boolean = () => true,
+        condition: (asset: BlockTexture) => boolean = () => true,
     ): CompletionItem[] {
         const completions: CompletionItem[] = [];
         ASSET_INDEX?.blockTextures.forEach((element) => {
-            if (_filter(element))
+            if (condition(element))
                 completions.push({
                     label: element.id,
                     kind: CompletionItemKind.Struct,
@@ -70,10 +86,13 @@ export class Item extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onItem(this);
     }
-    static getCompletions(_filter: (asset: Item) => boolean = () => true): CompletionItem[] {
+    static all(): Item[] {
+        return ASSET_INDEX?.items ?? [];
+    }
+    static getCompletions(condition: (asset: Item) => boolean = () => true): CompletionItem[] {
         const completions: CompletionItem[] = [];
         ASSET_INDEX?.items.forEach((element) => {
-            if (_filter(element))
+            if (condition(element))
                 completions.push({
                     label: element.id,
                     kind: CompletionItemKind.Class,
@@ -85,12 +104,19 @@ export class Item extends Asset {
     }
 }
 export class ItemTexture extends Asset {
-    static getCompletions(_filter: (asset: ItemTexture) => boolean = () => true): CompletionItem[] {
+    static all(): ItemTexture[] {
+        return ASSET_INDEX?.itemTextures ?? [];
+    }
+    static getCompletions(
+        condition: (asset: ItemTexture) => boolean = () => true,
+    ): CompletionItem[] {
         const completions: CompletionItem[] = [];
         ASSET_INDEX?.itemTextures.forEach((element) => {
-            if (_filter(element))
+            if (condition(element))
                 completions.push({
                     label: element.id,
+                    insertText: '"' + element.id + '"',
+                    insertTextMode: InsertTextMode.asIs,
                     kind: CompletionItemKind.Struct,
                     data: completions.length,
                     detail: "item texture",
@@ -103,10 +129,13 @@ export class Tool extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onTool(this);
     }
-    static getCompletions(_filter: (asset: Tool) => boolean = () => true): CompletionItem[] {
+    static all(): Tool[] {
+        return ASSET_INDEX?.tools ?? [];
+    }
+    static getCompletions(condition: (asset: Tool) => boolean = () => true): CompletionItem[] {
         const completions: CompletionItem[] = [];
         ASSET_INDEX?.tools.forEach((element) => {
-            if (_filter(element))
+            if (condition(element))
                 completions.push({
                     label: element.id,
                     kind: CompletionItemKind.Class,
@@ -121,10 +150,13 @@ export class Biome extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onBiome(this);
     }
-    static getCompletions(_filter: (asset: Biome) => boolean = () => true): CompletionItem[] {
+    static all(): Biome[] {
+        return ASSET_INDEX?.biomes ?? [];
+    }
+    static getCompletions(condition: (asset: Biome) => boolean = () => true): CompletionItem[] {
         const completions: CompletionItem[] = [];
         ASSET_INDEX?.biomes.forEach((element) => {
-            if (_filter(element))
+            if (condition(element))
                 completions.push({
                     label: element.id,
                     kind: CompletionItemKind.Class,
@@ -136,10 +168,13 @@ export class Biome extends Asset {
     }
 }
 export class Model extends Asset {
-    static getCompletions(_filter: (asset: Model) => boolean = () => true): CompletionItem[] {
+    static all(): Model[] {
+        return ASSET_INDEX?.models ?? [];
+    }
+    static getCompletions(condition: (asset: Model) => boolean = () => true): CompletionItem[] {
         const completions: CompletionItem[] = [];
         ASSET_INDEX?.models.forEach((element) => {
-            if (_filter(element))
+            if (condition(element))
                 completions.push({
                     label: element.id,
                     kind: CompletionItemKind.Module,
@@ -154,10 +189,13 @@ export class SBB extends Asset {
     async visit(provider: CompletionVisitor): Promise<void> {
         await provider.onSBB(this);
     }
-    static getCompletions(_filter: (asset: SBB) => boolean = () => true): CompletionItem[] {
+    static all(): SBB[] {
+        return ASSET_INDEX?.structureBuildingBlocks ?? [];
+    }
+    static getCompletions(condition: (asset: SBB) => boolean = () => true): CompletionItem[] {
         const completions: CompletionItem[] = [];
         ASSET_INDEX?.structureBuildingBlocks.forEach((element) => {
-            if (_filter(element))
+            if (condition(element))
                 completions.push({
                     label: element.id,
                     kind: CompletionItemKind.Class,
@@ -169,10 +207,13 @@ export class SBB extends Asset {
     }
 }
 export class Blueprint extends Asset {
-    static getCompletions(_filter: (asset: Blueprint) => boolean = () => true): CompletionItem[] {
+    static all(): Blueprint[] {
+        return ASSET_INDEX?.blueprints ?? [];
+    }
+    static getCompletions(condition: (asset: Blueprint) => boolean = () => true): CompletionItem[] {
         const completions: CompletionItem[] = [];
         ASSET_INDEX?.blueprints.forEach((element) => {
-            if (_filter(element))
+            if (condition(element))
                 completions.push({
                     label: element.id,
                     kind: CompletionItemKind.Module,
@@ -271,9 +312,9 @@ export class AssetIndex {
         return index;
     }
 
-    static async registerAsset<AssetT>(
-        cls: new (id: string, location: string) => AssetT,
-        storage: AssetT[],
+    static async registerAsset<T extends Asset>(
+        cls: AssetInterfaceConstructor<T>,
+        storage: T[],
         scope: string,
         addon: string,
         extension: string,
@@ -304,9 +345,9 @@ export class AssetIndex {
             log.log(`Registered ${scope} asset: '${id}' at ${location}`);
         }
     }
-    static async registerTextures<AssetT>(
-        cls: new (id: string, location: string) => AssetT,
-        storage: AssetT[],
+    static async registerTextures<T extends Asset>(
+        cls: AssetInterfaceConstructor<T>,
+        storage: T[],
         scope: string,
         addon: string,
     ) {

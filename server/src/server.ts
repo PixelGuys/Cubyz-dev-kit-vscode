@@ -124,19 +124,19 @@ connection.onCompletion(async (params: CompletionParams) => {
 
     switch (scope) {
         case "blocks":
-            new Block("<temp>", relativePath).visit(visitor);
+            new Block("", "").visit(visitor);
             break;
         case "items":
-            new Item("<temp>", relativePath).visit(visitor);
+            new Item("", "").visit(visitor);
             break;
         case "tools":
-            new Tool("<temp>", relativePath).visit(visitor);
+            new Tool("", "").visit(visitor);
             break;
         case "biomes":
-            new Biome("<temp>", relativePath).visit(visitor);
+            new Biome("", "").visit(visitor);
             break;
         case "sbb":
-            new SBB("<temp>", relativePath).visit(visitor);
+            new SBB("", "").visit(visitor);
             break;
     }
 

@@ -561,10 +561,10 @@ export class Parser {
         );
     }
     private syntaxError(): ZonNode {
-        const m = this.rest.match(/^\r\n|\n|$/);
+        const m = this.rest.match(/(.*?)\r\n|\n|$/);
         if (!m) throw new Error("Reached unreachable code");
         const start = this.location.clone();
-        const value = this.rest.slice(0, m[0].length);
+        const value = this.rest.slice(0, m[1].length);
 
         this.location.advance(m[0]);
         this.rest = this.rest.slice(m[0].length);

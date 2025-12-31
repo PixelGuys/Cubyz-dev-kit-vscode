@@ -1,4 +1,10 @@
-import { CompletionItem, CompletionItemKind, CompletionParams } from "vscode-languageserver/node";
+import {
+    CompletionItem,
+    CompletionItemKind,
+    CompletionParams,
+    InsertTextFormat,
+    InsertTextMode,
+} from "vscode-languageserver/node";
 import { Block, Item, Tool, Biome, SBB, Model, BlockTexture, ItemTexture } from "./assets";
 import {
     ZonNode,
@@ -20,18 +26,14 @@ interface Completion<T> {
     keyDetail?: string;
 }
 
-interface CompletionRef extends Completion<"ref"> {
-    ref: (string | number)[];
-}
-
 interface NumberCompletion extends Completion<"number"> {
     completions: () => void;
 }
 interface StringCompletion extends Completion<"string"> {
-    completions: (prefix: string) => void;
+    completions: (node: ZonNode) => void;
 }
 interface IdentifierCompletion extends Completion<"identifier"> {
-    completions: (prefix: string) => void;
+    completions: () => void;
 }
 
 interface ObjectCompletion extends Completion<"object"> {
@@ -47,8 +49,7 @@ type AnyCompletion =
     | StringCompletion
     | IdentifierCompletion
     | ObjectCompletion
-    | ArrayCompletion
-    | CompletionRef;
+    | ArrayCompletion;
 
 class ResolveCompletion {
     visitor: CompletionVisitor;
@@ -68,6 +69,17 @@ class ResolveCompletion {
         switch (completion.type) {
             case "object": {
                 const [first, ...rest] = path;
+
+                if (first instanceof ZonSyntaxError && [".", ""].includes(first.value)) {
+                    this.visitor.completions.push({
+                        label: ".{}",
+                        insertText: ".{$0}",
+                        kind: CompletionItemKind.Method,
+                        insertTextFormat: InsertTextFormat.Snippet,
+                    });
+                    break;
+                }
+
                 if (
                     !(
                         first instanceof ZonObject ||
@@ -75,7 +87,8 @@ class ResolveCompletion {
                         first instanceof ZonArray
                     )
                 )
-                    return;
+                    break;
+
                 this.obj(first, rest, completion);
                 break;
             }
@@ -118,11 +131,6 @@ class ResolveCompletion {
 
         // Object can be misinterpreted as an array if there is a syntax error / it was not finished yet.
         if (zonObject instanceof ZonArray) {
-            const allAreSyntaxErrors = zonObject.items
-                .map((x) => x instanceof ZonSyntaxError)
-                .reduce((prev, curr) => prev && curr);
-            if (!allAreSyntaxErrors) return;
-
             if (rest.length > 1) return; // Deep completion inside arrays is not supported form object perspective.
             if (rest.length === 0) {
                 const target = rest[0] as ZonSyntaxError;
@@ -197,14 +205,14 @@ class ResolveCompletion {
             this.visitor.completions.push({
                 label: `.${key}`,
                 kind: objectCompletions[key].keyKind ?? CompletionItemKind.Keyword,
-                detail: objectCompletions[key].keyDetail ?? "option",
+                detail: objectCompletions[key].keyDetail ?? objectCompletions[key].type,
             });
         }
     }
     array(_first: ZonArray | ZonEmpty, _rest: ZonNode[], _completion: ArrayCompletion): void {}
     number(_first: ZonNumber | ZonSyntaxError, _completion: NumberCompletion): void {}
     string(first: ZonString | ZonSyntaxError, completion: StringCompletion): void {
-        completion.completions(first.getValueString() ?? "");
+        completion.completions(first);
     }
     identifier(_first: ZonIdentifier | ZonSyntaxError, _completion: IdentifierCompletion): void {}
 }
@@ -224,13 +232,50 @@ export class CompletionVisitor {
         this.nodePath = nodePath;
     }
 
-    async onBlock(_asset: Block): Promise<void> {
-        const completeTexture = (prefix: string) => {
-            const completions = BlockTexture.getCompletions((m: Model) => m.id.startsWith(prefix));
+    getBlockTextureCompletionCallback(): (node: ZonNode) => void {
+        return (node: ZonNode) => {
+            const completions = BlockTexture.all().map((e: BlockTexture): CompletionItem => {
+                return {
+                    label: e.id,
+                    insertText: node instanceof ZonString ? e.id : '"' + e.id + '"',
+                    insertTextMode: InsertTextMode.asIs,
+                    kind: CompletionItemKind.Struct,
+                    detail: "block texture",
+                };
+            });
             this.completions.push(...completions);
             return;
         };
-
+    }
+    getItemTextureCompletionCallback(): (node: ZonNode) => void {
+        return (node: ZonNode) => {
+            const completions = ItemTexture.all().map((e: ItemTexture): CompletionItem => {
+                return {
+                    label: e.id,
+                    insertText: node instanceof ZonString ? e.id : '"' + e.id + '"',
+                    insertTextMode: InsertTextMode.asIs,
+                    kind: CompletionItemKind.Struct,
+                    detail: "item texture",
+                };
+            });
+            this.completions.push(...completions);
+        };
+    }
+    getModelCompletionCallback(): (node: ZonNode) => void {
+        return (node: ZonNode) => {
+            const completions = Model.all().map((e: Model): CompletionItem => {
+                return {
+                    label: e.id,
+                    insertText: node instanceof ZonString ? e.id : '"' + e.id + '"',
+                    insertTextMode: InsertTextMode.asIs,
+                    kind: CompletionItemKind.Module,
+                    detail: "model",
+                };
+            });
+            this.completions.push(...completions);
+        };
+    }
+    async onBlock(_asset: Block): Promise<void> {
         new ResolveCompletion(this).any(this.nodePath.path, {
             type: "object",
             completions: () => ({
@@ -272,7 +317,7 @@ export class CompletionVisitor {
                         },
                         texture: {
                             type: "string",
-                            completions: () => {},
+                            completions: this.getItemTextureCompletionCallback(),
                         },
                     }),
                 },
@@ -366,22 +411,27 @@ export class CompletionVisitor {
                 },
                 model: {
                     type: "string",
-                    completions: (prefix: string) => {
-                        const completions = Model.getCompletions((m: Model) =>
-                            m.id.startsWith(prefix),
-                        );
-                        this.completions.push(...completions);
-                        return;
-                    },
+                    completions: this.getModelCompletionCallback(),
                 },
-                texture0: {
-                    type: "string",
-                    completions: completeTexture,
-                },
-                texture1: {
-                    type: "ref",
-                    ref: ["texture0"],
-                },
+                ...(() => {
+                    const completions: Record<string, AnyCompletion> = {};
+                    const completionCallback = this.getBlockTextureCompletionCallback();
+                    for (const suffix of [
+                        ...Array(16).keys(),
+                        "",
+                        "_front",
+                        "_left",
+                        "_right",
+                        "_top",
+                        "_bottom",
+                    ]) {
+                        completions[`texture${suffix}`] = {
+                            type: "string",
+                            completions: completionCallback,
+                        };
+                    }
+                    return completions;
+                })(),
             }),
         });
 
