@@ -33,13 +33,12 @@ interface StringCompletion extends Completion<"string"> {
     completions: (node: ZonNode) => void;
 }
 interface IdentifierCompletion extends Completion<"identifier"> {
-    completions: () => void;
+    completions: (node: ZonIdentifier) => void;
 }
-
+type BooleanCompletion = Completion<"boolean">;
 interface ObjectCompletion extends Completion<"object"> {
     completions: () => Record<string, AnyCompletion>;
 }
-
 interface ArrayCompletion extends Completion<"array"> {
     completions: () => AnyCompletion[];
 }
@@ -49,7 +48,8 @@ type AnyCompletion =
     | StringCompletion
     | IdentifierCompletion
     | ObjectCompletion
-    | ArrayCompletion;
+    | ArrayCompletion
+    | BooleanCompletion;
 
 class ResolveCompletion {
     visitor: CompletionVisitor;
@@ -118,6 +118,12 @@ class ResolveCompletion {
                 if (rest.length > 0) return;
                 this.identifier(first, completion);
                 break;
+            }
+            case "boolean": {
+                const [first, ...rest] = path;
+                if (!(first instanceof ZonString || first instanceof ZonSyntaxError)) return;
+                if (rest.length > 0) return;
+                this.boolean();
             }
         }
     }
@@ -214,7 +220,19 @@ class ResolveCompletion {
     string(first: ZonString | ZonSyntaxError, completion: StringCompletion): void {
         completion.completions(first);
     }
-    identifier(_first: ZonIdentifier | ZonSyntaxError, _completion: IdentifierCompletion): void {}
+    boolean(): void {
+        const completions = ["true", "false"].map((e: string): CompletionItem => {
+            return {
+                label: e,
+                kind: CompletionItemKind.Constant,
+                detail: "item texture",
+            };
+        });
+        this.visitor.completions.push(...completions);
+    }
+    identifier(first: ZonIdentifier | ZonSyntaxError, completion: IdentifierCompletion): void {
+        completion.completions(first);
+    }
 }
 
 export class CompletionVisitor {
@@ -275,6 +293,34 @@ export class CompletionVisitor {
             this.completions.push(...completions);
         };
     }
+    getRotationCompletionCallback(): (node: ZonNode) => void {
+        return (node: ZonNode) => {
+            const completions = [
+                "cubyz:branch",
+                "cubyz:carpet",
+                "cubyz:direction",
+                "cubyz:fence",
+                "cubyz:hanging",
+                "cubyz:log",
+                "cubyz:no_rotation",
+                "cubyz:ore",
+                "cubyz:planar",
+                "cubyz:sign",
+                "cubyz:stairs",
+                "cubyz:texture_pile",
+                "cubyz:torch",
+            ].map((s: string): CompletionItem => {
+                return {
+                    label: s,
+                    insertText: node instanceof ZonString ? s : '"' + s + '"',
+                    insertTextMode: InsertTextMode.asIs,
+                    kind: CompletionItemKind.Module,
+                    detail: "model",
+                };
+            });
+            this.completions.push(...completions);
+        };
+    }
     async onBlock(_asset: Block): Promise<void> {
         new ResolveCompletion(this).any(this.nodePath.path, {
             type: "object",
@@ -323,7 +369,7 @@ export class CompletionVisitor {
                 },
                 rotation: {
                     type: "string",
-                    completions: () => {},
+                    completions: this.getRotationCompletionCallback(),
                 },
                 blockHealth: {
                     type: "string",
@@ -345,10 +391,7 @@ export class CompletionVisitor {
                     type: "string",
                     completions: () => {},
                 },
-                degradable: {
-                    type: "string",
-                    completions: () => {},
-                },
+                degradable: { type: "boolean" },
                 selectable: {
                     type: "string",
                     completions: () => {},
@@ -378,27 +421,27 @@ export class CompletionVisitor {
                     completions: () => {},
                 },
                 friction: {
-                    type: "string",
+                    type: "number",
                     completions: () => {},
                 },
                 bounciness: {
-                    type: "string",
+                    type: "number",
                     completions: () => {},
                 },
                 density: {
-                    type: "string",
+                    type: "number",
                     completions: () => {},
                 },
                 terminalVelocity: {
-                    type: "string",
+                    type: "number",
                     completions: () => {},
                 },
                 mobility: {
-                    type: "string",
+                    type: "number",
                     completions: () => {},
                 },
                 allowOres: {
-                    type: "string",
+                    type: "boolean",
                     completions: () => {},
                 },
                 blockEntity: {
@@ -406,8 +449,29 @@ export class CompletionVisitor {
                     completions: () => {},
                 },
                 ore: {
-                    type: "string",
-                    completions: () => {},
+                    type: "object",
+                    completions: () => ({
+                        veins: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                        size: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                        height: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                        minHeight: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                        density: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                    }),
                 },
                 model: {
                     type: "string",
