@@ -8,7 +8,6 @@ import {
 import { Block, Item, Tool, Biome, SBB, Model, BlockTexture, ItemTexture } from "./assets";
 import {
     ZonNode,
-    Is,
     ZonSyntaxError,
     ZonIdentifier,
     ZonEntry,
@@ -27,7 +26,10 @@ interface Completion<T> {
 }
 
 interface NumberCompletion extends Completion<"number"> {
-    completions: () => void;
+    completions?: () => void;
+}
+interface ColorCompletion extends Completion<"color"> {
+    completions?: () => void;
 }
 interface StringCompletion extends Completion<"string"> {
     completions: (node: ZonNode) => void;
@@ -40,7 +42,7 @@ interface ObjectCompletion extends Completion<"object"> {
     completions: () => Record<string, AnyCompletion>;
 }
 interface ArrayCompletion extends Completion<"array"> {
-    completions: () => AnyCompletion[];
+    completions: () => AnyCompletion;
 }
 
 type AnyCompletion =
@@ -49,7 +51,8 @@ type AnyCompletion =
     | IdentifierCompletion
     | ObjectCompletion
     | ArrayCompletion
-    | BooleanCompletion;
+    | BooleanCompletion
+    | ColorCompletion;
 
 class ResolveCompletion {
     visitor: CompletionVisitor;
@@ -64,8 +67,6 @@ class ResolveCompletion {
      * to visitor specified in a constructor of this class.
      */
     any(path: ZonNode[], completion: AnyCompletion): void {
-        if (path.length === 0) return;
-
         switch (completion.type) {
             case "object": {
                 const [first, ...rest] = path;
@@ -94,7 +95,14 @@ class ResolveCompletion {
             }
             case "array": {
                 const [first, ...rest] = path;
-                if (!(first instanceof ZonArray || first instanceof ZonEmpty)) return;
+                if (
+                    !(
+                        first instanceof ZonArray ||
+                        first instanceof ZonEmpty ||
+                        first instanceof ZonSyntaxError
+                    )
+                )
+                    return;
                 this.array(first, rest, completion);
                 break;
             }
@@ -124,6 +132,13 @@ class ResolveCompletion {
                 if (!(first instanceof ZonString || first instanceof ZonSyntaxError)) return;
                 if (rest.length > 0) return;
                 this.boolean();
+                break;
+            }
+            case "color": {
+                if (path.length == 0) {
+                    this.color(completion);
+                }
+                break;
             }
         }
     }
@@ -210,13 +225,49 @@ class ResolveCompletion {
 
             this.visitor.completions.push({
                 label: `.${key}`,
+                insertText: `.${key} = `,
                 kind: objectCompletions[key].keyKind ?? CompletionItemKind.Keyword,
                 detail: objectCompletions[key].keyDetail ?? objectCompletions[key].type,
             });
         }
     }
-    array(_first: ZonArray | ZonEmpty, _rest: ZonNode[], _completion: ArrayCompletion): void {}
+    array(
+        zonArray: ZonArray | ZonEmpty | ZonSyntaxError,
+        rest: ZonNode[],
+        completion: ArrayCompletion,
+    ): void {
+        if (rest.length == 0 && zonArray instanceof ZonSyntaxError) {
+            this.visitor.completions.push({
+                label: ".{}",
+                insertText: ".{$0},",
+                insertTextFormat: InsertTextFormat.Snippet,
+                kind: CompletionItemKind.Keyword,
+                detail: "array",
+            });
+            return;
+        }
+        return this.any(rest, completion.completions());
+    }
     number(_first: ZonNumber | ZonSyntaxError, _completion: NumberCompletion): void {}
+    color(_completion: ColorCompletion): void {
+        this.visitor.completions.push({
+            label: "0x${0}${1}${2}${3}",
+            insertText: "0x${1:ff}${2:ff}${3:ff}${4:ff}$0",
+            kind: CompletionItemKind.Method,
+            insertTextFormat: InsertTextFormat.Snippet,
+            detail: "ARGB color template",
+        });
+        this.visitor.completions.push({
+            label: `0xffffffff`,
+            kind: CompletionItemKind.Constant,
+            detail: "ARGB white color value",
+        });
+        this.visitor.completions.push({
+            label: `0xff000000`,
+            kind: CompletionItemKind.Constant,
+            detail: "ARGB black color value",
+        });
+    }
     string(first: ZonString | ZonSyntaxError, completion: StringCompletion): void {
         completion.completions(first);
     }
@@ -249,7 +300,123 @@ export class CompletionVisitor {
         this.node = node;
         this.nodePath = nodePath;
     }
+    async onBlock(_asset: Block): Promise<void> {
+        new ResolveCompletion(this).any(this.nodePath.path, {
+            type: "object",
+            completions: () => ({
+                item: {
+                    type: "object",
+                    completions: () => ({
+                        material: {
+                            type: "object",
+                            completions: () => ({
+                                durability: { type: "number" },
+                                massDamage: { type: "number" },
+                                hardnessDamage: { type: "number" },
+                                swingSpeed: { type: "number" },
+                                textureRoughness: { type: "number" },
+                                colors: {
+                                    type: "array",
+                                    completions: () => ({ type: "color" }),
+                                },
+                                modifiers: {
+                                    type: "array",
+                                    completions: () => ({ type: "number" }),
+                                },
+                            }),
+                        },
+                        texture: {
+                            type: "string",
+                            completions: this.getItemTextureCompletionCallback(),
+                        },
+                    }),
+                },
+                rotation: {
+                    type: "string",
+                    completions: this.getRotationCompletionCallback(),
+                },
+                blockHealth: {
+                    type: "string",
+                    completions: () => {},
+                },
+                blockResistance: {
+                    type: "string",
+                    completions: () => {},
+                },
+                tags: {
+                    type: "array",
+                    completions: () => ({
+                        type: "string",
+                        completions: this.getHardCodedIdentifierCompletionCallback([
+                            ".air",
+                            ".fluid",
+                            ".sbbChild",
+                            ".fluidPlaceable",
+                            ".chiselable",
+                        ]),
+                    }),
+                },
+                emittedLight: { type: "number" },
+                absorbedLight: { type: "number" },
+                degradable: { type: "boolean" },
+                selectable: { type: "boolean" },
+                replacable: { type: "boolean" },
+                transparent: { type: "boolean" },
+                collide: { type: "boolean" },
+                alwaysViewThrough: { type: "boolean" },
+                viewThrough: { type: "boolean" },
+                hasBackFace: { type: "boolean" },
+                friction: { type: "number" },
+                bounciness: { type: "number" },
+                density: { type: "number" },
+                terminalVelocity: { type: "number" },
+                mobility: { type: "number" },
+                allowOres: {
+                    type: "boolean",
+                    completions: () => {},
+                },
+                blockEntity: {
+                    type: "string",
+                    completions: () => {},
+                },
+                ore: {
+                    type: "object",
+                    completions: () => ({
+                        veins: { type: "number" },
+                        size: { type: "number" },
+                        height: { type: "number" },
+                        minHeight: { type: "number" },
+                        density: { type: "number" },
+                    }),
+                },
+                model: {
+                    type: "string",
+                    completions: this.getModelCompletionCallback(),
+                },
+                ...(() => {
+                    const completions: Record<string, AnyCompletion> = {};
+                    const completionCallback = this.getBlockTextureCompletionCallback();
+                    for (const suffix of [
+                        ...Array(16).keys(),
+                        "",
+                        "_front",
+                        "_left",
+                        "_right",
+                        "_top",
+                        "_bottom",
+                    ]) {
+                        completions[`texture${suffix}`] = {
+                            type: "string",
+                            completions: completionCallback,
+                        };
+                    }
+                    return completions;
+                })(),
+            }),
+        });
 
+        return;
+    }
     getBlockTextureCompletionCallback(): (node: ZonNode) => void {
         return (node: ZonNode) => {
             const completions = BlockTexture.all().map((e: BlockTexture): CompletionItem => {
@@ -293,6 +460,18 @@ export class CompletionVisitor {
             this.completions.push(...completions);
         };
     }
+    getHardCodedIdentifierCompletionCallback(array: string[]): (node: ZonNode) => void {
+        return () => {
+            const completions = array.map((s: string): CompletionItem => {
+                return {
+                    label: s,
+                    kind: CompletionItemKind.Constant,
+                    detail: "model",
+                };
+            });
+            this.completions.push(...completions);
+        };
+    }
     getRotationCompletionCallback(): (node: ZonNode) => void {
         return (node: ZonNode) => {
             const completions = [
@@ -321,186 +500,6 @@ export class CompletionVisitor {
             this.completions.push(...completions);
         };
     }
-    async onBlock(_asset: Block): Promise<void> {
-        new ResolveCompletion(this).any(this.nodePath.path, {
-            type: "object",
-            completions: () => ({
-                item: {
-                    type: "object",
-                    completions: () => ({
-                        material: {
-                            type: "object",
-                            completions: () => ({
-                                durability: {
-                                    type: "number",
-                                    completions: () => {},
-                                },
-                                massDamage: {
-                                    type: "number",
-                                    completions: () => {},
-                                },
-                                hardnessDamage: {
-                                    type: "number",
-                                    completions: () => {},
-                                },
-                                swingSpeed: {
-                                    type: "number",
-                                    completions: () => {},
-                                },
-                                textureRoughness: {
-                                    type: "number",
-                                    completions: () => {},
-                                },
-                                colors: {
-                                    type: "array",
-                                    completions: () => [],
-                                },
-                                modifiers: {
-                                    type: "array",
-                                    completions: () => [],
-                                },
-                            }),
-                        },
-                        texture: {
-                            type: "string",
-                            completions: this.getItemTextureCompletionCallback(),
-                        },
-                    }),
-                },
-                rotation: {
-                    type: "string",
-                    completions: this.getRotationCompletionCallback(),
-                },
-                blockHealth: {
-                    type: "string",
-                    completions: () => {},
-                },
-                blockResistance: {
-                    type: "string",
-                    completions: () => {},
-                },
-                tags: {
-                    type: "string",
-                    completions: () => {},
-                },
-                emittedLight: {
-                    type: "string",
-                    completions: () => {},
-                },
-                absorbedLight: {
-                    type: "string",
-                    completions: () => {},
-                },
-                degradable: { type: "boolean" },
-                selectable: {
-                    type: "string",
-                    completions: () => {},
-                },
-                replacable: {
-                    type: "string",
-                    completions: () => {},
-                },
-                transparent: {
-                    type: "string",
-                    completions: () => {},
-                },
-                collide: {
-                    type: "string",
-                    completions: () => {},
-                },
-                alwaysViewThrough: {
-                    type: "string",
-                    completions: () => {},
-                },
-                viewThrough: {
-                    type: "string",
-                    completions: () => {},
-                },
-                hasBackFace: {
-                    type: "string",
-                    completions: () => {},
-                },
-                friction: {
-                    type: "number",
-                    completions: () => {},
-                },
-                bounciness: {
-                    type: "number",
-                    completions: () => {},
-                },
-                density: {
-                    type: "number",
-                    completions: () => {},
-                },
-                terminalVelocity: {
-                    type: "number",
-                    completions: () => {},
-                },
-                mobility: {
-                    type: "number",
-                    completions: () => {},
-                },
-                allowOres: {
-                    type: "boolean",
-                    completions: () => {},
-                },
-                blockEntity: {
-                    type: "string",
-                    completions: () => {},
-                },
-                ore: {
-                    type: "object",
-                    completions: () => ({
-                        veins: {
-                            type: "number",
-                            completions: () => {},
-                        },
-                        size: {
-                            type: "number",
-                            completions: () => {},
-                        },
-                        height: {
-                            type: "number",
-                            completions: () => {},
-                        },
-                        minHeight: {
-                            type: "number",
-                            completions: () => {},
-                        },
-                        density: {
-                            type: "number",
-                            completions: () => {},
-                        },
-                    }),
-                },
-                model: {
-                    type: "string",
-                    completions: this.getModelCompletionCallback(),
-                },
-                ...(() => {
-                    const completions: Record<string, AnyCompletion> = {};
-                    const completionCallback = this.getBlockTextureCompletionCallback();
-                    for (const suffix of [
-                        ...Array(16).keys(),
-                        "",
-                        "_front",
-                        "_left",
-                        "_right",
-                        "_top",
-                        "_bottom",
-                    ]) {
-                        completions[`texture${suffix}`] = {
-                            type: "string",
-                            completions: completionCallback,
-                        };
-                    }
-                    return completions;
-                })(),
-            }),
-        });
-
-        return;
-    }
     addCompletionsLike(symbols: string[], like: string, extra: object = {}): void {
         return this.addCompletions(
             symbols.filter((item) => item.startsWith(like) || item.substring(1).startsWith(like)),
@@ -517,57 +516,50 @@ export class CompletionVisitor {
         });
     }
     async onItem(_asset: Item): Promise<void> {
-        const topLevelKeys = [
-            ".name",
-            ".tags",
-            ".stackSize",
-            ".material",
-            ".block",
-            ".texture",
-            ".foodValue",
-        ];
-        const materialKeys = [
-            ".density",
-            ".elasticity",
-            ".hardness",
-            ".textureRoughness",
-            ".colors",
-        ];
-        if (Is.topLevelObject(this.node)) {
-            if (Is.entryKeyEqual(this.node, "texture")) {
-                this.completions.push(...ItemTexture.getCompletions());
-                return;
-            }
-            if (Is.childOfEntry(this.node)) {
-                if (this.node instanceof ZonSyntaxError || this.node instanceof ZonIdentifier) {
-                    this.addCompletions(topLevelKeys);
-                    return;
-                }
-            }
-        }
-        if (Is.topLevelObject(this.node)) {
-            this.addCompletions(topLevelKeys);
-            return;
-        }
-        if (this.node instanceof ZonSyntaxError || this.node instanceof ZonIdentifier) {
-            if (this.node.parent instanceof ZonEntry) {
-                const materialsEntry = this.node.parent;
-                if (materialsEntry.parent instanceof ZonObject) {
-                    const materialsObject = materialsEntry.parent;
-                    if (materialsObject.parent instanceof ZonEntry) {
-                        const itemEntry = materialsObject.parent;
-                        if (
-                            (itemEntry.key instanceof ZonIdentifier ||
-                                itemEntry.key instanceof ZonSyntaxError) &&
-                            itemEntry.key.value === "material"
-                        ) {
-                            this.addCompletions(materialKeys);
-                            return;
-                        }
-                    }
-                }
-            }
-        }
+        new ResolveCompletion(this).any(this.nodePath.path, {
+            type: "object",
+            completions: () => ({
+                material: {
+                    type: "object",
+                    completions: () => ({
+                        durability: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                        massDamage: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                        hardnessDamage: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                        swingSpeed: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                        textureRoughness: {
+                            type: "number",
+                            completions: () => {},
+                        },
+                        colors: {
+                            type: "array",
+                            completions: () => ({ type: "color" }),
+                        },
+                        modifiers: {
+                            type: "array",
+                            completions: () => ({ type: "number" }),
+                        },
+                    }),
+                },
+                texture: {
+                    type: "string",
+                    completions: this.getItemTextureCompletionCallback(),
+                },
+            }),
+        });
+
+        return;
     }
     async onTool(_asset: Tool): Promise<void> {}
     async onBiome(_asset: Biome): Promise<void> {}

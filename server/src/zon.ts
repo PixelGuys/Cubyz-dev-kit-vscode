@@ -762,30 +762,28 @@ export class Parser {
         return new ZonBoolean(m[1] === "true", start, this.location.clone());
     }
     public parseNumber(): ZonNode | undefined {
-        const m = this.rest.match(/^([+-]?\d(\.\d)?|0x[0-9a-fA-F]+)/);
-        if (!m) return undefined;
+        {
+            const m = this.rest.match(/^0x[a-fA-F0-9]+/);
+            if (m) return this.finishNumber(m);
+        }
+        {
+            const m = this.rest.match(
+                /^-?(([0-9]+\.)|(\.[0-9]+)|([0-9]+\.[0-9]+))(?:[eE][+-]?[1-9]+)?/,
+            );
+            if (m) return this.finishNumber(m);
+        }
+        {
+            const m = this.rest.match(/^-?[0-9]+/);
+            if (m) return this.finishNumber(m);
+        }
+        return undefined;
+    }
+    finishNumber(m: RegExpMatchArray): ZonNode {
         const start = this.location.clone();
 
         this.location.advance(m[0]);
         this.rest = this.rest.slice(m[0].length);
 
         return new ZonNumber(m[0], start, this.location.clone());
-    }
-}
-
-export class Is {
-    static childOfEntry(node: ZonNode): boolean {
-        return node.parent instanceof ZonEntry;
-    }
-    static entryKeyEqual(node: ZonNode, key: string): boolean {
-        if (!(node.parent instanceof ZonEntry)) return false;
-        if (!(node.parent.key instanceof ZonIdentifier)) return false;
-        return node.parent.key.value === key;
-    }
-    static topLevel(node: ZonNode | null): boolean {
-        return node === null || node.parent === null;
-    }
-    static topLevelObject(node: ZonNode): boolean {
-        return (node instanceof ZonObject || node instanceof ZonEmpty) && node.parent === null;
     }
 }
