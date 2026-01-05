@@ -111,32 +111,36 @@ connection.onCompletion(async (params: CompletionParams) => {
     console.log(ast);
 
     const position = new zon.Location(params.position.character, params.position.line);
-    const node = new zon.FindZonNode().find(ast, position);
+    const nodeFinder = new zon.FindZonNode();
+    const result = nodeFinder.find(ast, position);
+    if (result === null) return [];
+
+    const [node, nodePath] = result;
     console.log(node);
+    console.log(nodePath);
 
-    if (node === null) return [];
-    if (!(node instanceof zon.ZonSyntaxError) && !(node instanceof zon.ZonString)) return [];
-
-    const visitor = new CompletionVisitor(params, ast, node);
+    const visitor = new CompletionVisitor(params, ast, node, nodePath);
+    console.log(`Collecting completions for scope ${scope}`);
 
     switch (scope) {
         case "blocks":
-            new Block("<temp>", relativePath).visit(visitor);
+            new Block("", "").visit(visitor);
             break;
         case "items":
-            new Item("<temp>", relativePath).visit(visitor);
+            new Item("", "").visit(visitor);
             break;
         case "tools":
-            new Tool("<temp>", relativePath).visit(visitor);
+            new Tool("", "").visit(visitor);
             break;
         case "biomes":
-            new Biome("<temp>", relativePath).visit(visitor);
+            new Biome("", "").visit(visitor);
             break;
         case "sbb":
-            new SBB("<temp>", relativePath).visit(visitor);
+            new SBB("", "").visit(visitor);
             break;
     }
 
+    console.log(`Finished collecting completions: ${visitor.completions.length} items found.`);
     return visitor.completions;
 });
 
